@@ -10,7 +10,7 @@ link_script             := kernel.lds
 modules                 := lib init kern
 targets                 := $(mos_elf)
 syms_file               := $(target_dir)/prog.syms
-gxemul_files            += $(mos_elf)
+qemu_files            += $(mos_elf)
 
 lab-ge = $(shell [ "$$(echo $(lab)_ | cut -f1 -d_)" -ge $(1) ] && echo true)
 
@@ -77,15 +77,15 @@ clean:
 # ifneq ($(prog),)
 # dbg:
 # 	$(CROSS_COMPILE)nm -S '$(prog)' > $(syms_file)
-# 	@gxemul_files=$(syms_file) gxemul_flags=-V $(MAKE) run
+# 	@qemu_files=$(syms_file) gxemul_flags=-V $(MAKE) run
 # else
 # dbg: gxemul_flags += -V
 # dbg: run
 # endif
 
-run: qemu_flags += -kernel target/mos -machine virt -m 64M -nographic
+run: qemu_flags += -bios qemu/opensbi-riscv64-generic-fw_dynamic.bin -kernel $(qemu_files) -machine virt -m 64M -nographic
 run:
-	qemu-system-riscv32 $(qemu_flags)
+	qemu/qemu-system-riscv64 $(qemu_flags)
 
 objdump:
 	@find * \( -name '*.b' -o -path $(mos_elf) \) -exec sh -c \
