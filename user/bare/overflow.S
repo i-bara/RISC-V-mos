@@ -8,5 +8,5 @@
 .text
 .globl _start
 _start:
-	li      $2, 0x80000000
-	addi    $3, $2, 0xffff  # overflow
+	li      x2, 0x80000000
+	addi    x3, x2, 0  # overflow

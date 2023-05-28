@@ -26,9 +26,18 @@ int elf_load_seg(Elf32_Phdr *ph, const void *bin, elf_mapper_t map_page, void *d
 	u_long va = ph->p_vaddr;
 	size_t bin_size = ph->p_filesz;
 	size_t sgsize = ph->p_memsz;
-	u_int perm = PTE_V;
+	u_int perm = PTE_V | PTE_U;
+
+	if (ph->p_flags & PF_R) {
+		perm |= PTE_R;
+	}
+
 	if (ph->p_flags & PF_W) {
-		perm |= PTE_D;
+		perm |= PTE_W;
+	}
+
+	if (ph->p_flags & PF_X) {
+		perm |= PTE_X;
 	}
 
 	int r;

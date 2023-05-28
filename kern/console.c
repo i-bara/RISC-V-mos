@@ -1,5 +1,5 @@
 #include <drivers/dev_cons.h>
-#include <asm/sbi.h>
+#include <sbi.h>
 #include <mmu.h>
 
 void printcharc(char ch) {

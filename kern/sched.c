@@ -58,8 +58,7 @@ void schedule(int yield) {
 	 */
 	/* Exercise 3.12: Your code here. */
 	count--;
-	// printk("count=%08x\n", count);
-	// debug_sched();
+	// printk("count=%d\n", count);
 	if (yield || !count || !e) {
 		if (e) {
 			TAILQ_REMOVE(&env_sched_list, e, env_sched_link);
@@ -86,4 +85,8 @@ void schedule(int yield) {
 	}
 	env_run(e);
 
+}
+
+void ba(int yield) {
+	printk("kkkkkkkkkk ba ba\n");
 }

@@ -1,6 +1,7 @@
 #ifndef _PMAP_H_
 #define _PMAP_H_
 
+#include <asm/sv39.h>
 #include <mmu.h>
 #include <printk.h>
 #include <queue.h>
@@ -25,38 +26,42 @@ struct Page {
 extern struct Page *pages;
 extern struct Page_list page_free_list;
 
-static inline u_long page2ppn(struct Page *pp) {
-	return pp - pages;
-}
+#define pa2page(pa) (&pages[(pa - 0x80000000) >> VPN0_SHIFT])
+#define page2pa(pp) (((((u_long)pp - (u_long)pages) / sizeof(struct Page)) << VPN0_SHIFT) + 0x80000000)
+#define page2kva(pp) page2pa(pp)
 
-static inline u_long page2pa(struct Page *pp) {
-	return page2ppn(pp) << PGSHIFT;
-}
+// static inline u_long page2ppn(struct Page *pp) {
+// 	return ((u_long)pp - (u_long)pages) / sizeof(struct Page);
+// }
 
-static inline struct Page *pa2page(u_long pa) {
-	if (PPN(pa) >= npage) {
-		panic("pa2page called with invalid pa: %x", pa);
-	}
-	return &pages[PPN(pa)];
-}
+// static inline u_long page2pa(struct Page *pp) {
+// 	return page2ppn(pp) << PGSHIFT;
+// }
 
-static inline u_long page2kva(struct Page *pp) {
-	return KADDR(page2pa(pp));
-}
+// static inline struct Page *pa2page(u_long pa) {
+// 	if (PPN(pa) >= npage) {
+// 		panic("pa2page called with invalid pa: %x", pa);
+// 	}
+// 	return &pages[PPN(pa)];
+// }
 
-static inline u_long va2pa(Pde *pgdir, u_long va) {
-	Pte *p;
+// static inline u_long page2kva(struct Page *pp) {
+// 	return KADDR(page2pa(pp));
+// }
 
-	pgdir = &pgdir[PDX(va)];
-	if (!(*pgdir & PTE_V)) {
-		return ~0;
-	}
-	p = (Pte *)KADDR(PTE_ADDR(*pgdir));
-	if (!(p[PTX(va)] & PTE_V)) {
-		return ~0;
-	}
-	return PTE_ADDR(p[PTX(va)]);
-}
+// static inline u_long va2pa(Pde *pgdir, u_long va) {
+// 	Pte *p;
+
+// 	pgdir = &pgdir[PDX(va)];
+// 	if (!(*pgdir & PTE_V)) {
+// 		return ~0;
+// 	}
+// 	p = (Pte *)KADDR(PTE_ADDR(*pgdir));
+// 	if (!(p[PTX(va)] & PTE_V)) {
+// 		return ~0;
+// 	}
+// 	return PTE_ADDR(p[PTX(va)]);
+// }
 
 void mips_detect_memory(void);
 void mips_vm_init(void);
@@ -79,16 +84,19 @@ void page_check(void);
 
 #define PA(pte) pte & ~0xfff;
 #define PERM(pte) pte & 0xfff;
-void page_debug(Pde *pgdir);
-void page_debug_va(Pde *pgdir, u_long va);
-u_long get_pa(Pde *pgdir, u_long va);
-u_long get_perm(Pde *pgdir, u_long va);
-void set_pa(Pde *pgdir, u_long va, u_long pa);
-void set_perm(Pde *pgdir, u_long va, u_long perm);
+void debug_page(u_long *pgdir);
+void debug_page_va(u_long *pgdir, u_long va);
+u_long get_pa(u_long *pgdir, u_long va);
+u_long get_perm(u_long *pgdir, u_long va);
+void set_pa(u_long *pgdir, u_long va, u_long pa);
+void set_perm(u_long *pgdir, u_long va, u_long perm);
 
-int map_page(Pde *pgdir, u_int asid, u_long va, u_long pa, u_int perm);
-int unmap_page(Pde *pgdir, u_int asid, u_long va);
-int is_mapped_page(Pde *pgdir, u_long va);
+int malloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm);
+int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm);
+int unmap_page(u_long *pgdir, u_int asid, u_long va);
+int is_mapped_page(u_long *pgdir, u_long va);
+
+int destroy_pgdir(u_long *pgdir, u_int asid);
 
 int create_pd(Pde **pgdir);
 int create_pt(Pde *pgdir, u_long pdx);

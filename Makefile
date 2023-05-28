@@ -87,6 +87,9 @@ run: qemu_flags += -bios qemu/opensbi-riscv64-generic-fw_dynamic.bin -kernel $(q
 run:
 	qemu/qemu-system-riscv64 $(qemu_flags)
 
+dbg: qemu_flags += -s -S
+dbg: run
+
 objdump:
 	@find * \( -name '*.b' -o -path $(mos_elf) \) -exec sh -c \
 	'$(CROSS_COMPILE)objdump {} -aldS > {}.objdump && echo {}.objdump' ';'

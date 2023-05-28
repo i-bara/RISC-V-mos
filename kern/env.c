@@ -1,10 +1,10 @@
-#include <asm/cp0regdef.h>
 #include <elf.h>
 #include <env.h>
 #include <mmu.h>
 #include <pmap.h>
 #include <printk.h>
 #include <sched.h>
+#include <asm/csrdef.h>
 
 // The maximum number of available ASIDs.
 // Our bitmap requires this to be a multiple of 32.
@@ -18,7 +18,7 @@ static struct Env_list env_free_list; // Free list
 // Invariant: 'env' in 'env_sched_list' iff. 'env->env_status' is 'RUNNABLE'.
 struct Env_sched_list env_sched_list; // Runnable list
 
-static Pde *base_pgdir;
+static u_long base_pgdir;
 
 static uint32_t asid_bitmap[NASID / 32] = {0}; // 64
 
@@ -55,33 +55,6 @@ static void asid_free(u_int i) {
 	int index = i >> 5;
 	int inner = i & 31;
 	asid_bitmap[index] &= ~(1 << inner);
-}
-
-/* Overview:
- *   Map [va, va+size) of virtual address space to physical [pa, pa+size) in the 'pgdir'. Use
- *   permission bits 'perm | PTE_V' for the entries.
- *
- * Pre-Condition:
- *   'pa', 'va' and 'size' are aligned to 'BY2PG'.
- */
-static void map_segment(Pde *pgdir, u_int asid, u_long pa, u_long va, u_int size, u_int perm) {
-
-	assert(pa % BY2PG == 0);
-	assert(va % BY2PG == 0);
-	assert(size % BY2PG == 0);
-
-	/* Step 1: Map virtual address space to physical address space. */
-	for (int i = 0; i < size; i += BY2PG) {
-		/*
-		 * Hint:
-		 *  Map the virtual page 'va + i' to the physical page 'pa + i' using 'page_insert'.
-		 *  Use 'pa2page' to get the 'struct Page *' of the physical address.
-		 */
-		/* Exercise 3.2: Your code here. */
-		struct Page *pp = pa2page(pa + i);
-		page_insert(pgdir, asid, pp, va + i, perm);
-
-	}
 }
 
 /* Overview:
@@ -150,6 +123,35 @@ int envid2env(u_int envid, struct Env **penv, int checkperm) {
 }
 
 /* Overview:
+ *   Map [va, va+size) of virtual address space to physical [pa, pa+size) in the 'pgdir'. Use
+ *   permission bits 'perm | PTE_V' for the entries.
+ *
+ * Pre-Condition:
+ *   'pa', 'va' and 'size' are aligned to 'BY2PG'.
+ */
+static void map_pages(u_long *pgdir, u_int asid, u_long pa, u_long va, u_long size, u_int perm) {
+
+	assert(pa % BY2PG == 0);
+	assert(va % BY2PG == 0);
+	assert(size % BY2PG == 0);
+
+	/* Step 1: Map virtual address space to physical address space. */
+	for (u_long i = 0; i < size; i += BY2PG) {
+		/*
+		 * Hint:
+		 *  Map the virtual page 'va + i' to the physical page 'pa + i' using 'page_insert'.
+		 *  Use 'pa2page' to get the 'struct Page *' of the physical address.
+		 */
+		/* Exercise 3.2: Your code here. */
+		// struct Page *pp = pa2page(pa + i);
+		// printk("%016lx->%016lx\n", va + i, pa + i);
+		map_page(pgdir, asid, va + i, pa + i, perm);
+		// page_insert(pgdir, asid, pp, va + i, perm);
+
+	}
+}
+
+/* Overview:
  *   Mark all environments in 'envs' as free and insert them into the 'env_free_list'.
  *   Insert in reverse order, so that the first call to 'env_alloc' returns 'envs[0]'.
  *
@@ -186,11 +188,49 @@ void env_init(void) {
 	panic_on(page_alloc(&p));
 	p->pp_ref++;
 
-	base_pgdir = (Pde *)page2kva(p);
-	map_segment(base_pgdir, 0, PADDR(pages), UPAGES, ROUND(npage * sizeof(struct Page), BY2PG),
+	base_pgdir = 0;
+	map_pages(&base_pgdir, 0, pages, PAGES, ROUND(npage * sizeof(struct Page), BY2PG),
 		    PTE_G);
-	map_segment(base_pgdir, 0, PADDR(envs), UENVS, ROUND(NENV * sizeof(struct Env), BY2PG),
+	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), BY2PG),
 		    PTE_G);
+	map_pages(&base_pgdir, 0, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X);
+	// printk("base is %016lx\n", base_pgdir);
+
+	// debug_page(&base_pgdir);
+
+	// printk("pa=%016lx  perm=%010b\n", get_pa(&base_pgdir, 0x81ffffff), get_perm(&base_pgdir, 0x802024fc));
+	// debug_page_va(&base_pgdir, 0x82fff000);
+	// printk("ppn=%016lx\n", SATP_MODE_SV39 | base_pgdir);
+
+	// debug_page(&base_pgdir);
+
+	u_long satp = SATP_MODE_SV39 | (base_pgdir >> 12);
+	printk("satp=%016lx\n", satp);
+
+	// u_long status;
+	// asm volatile("csrr %0, sstatus" : "=r"(status) :);
+	// asm volatile("csrw sscratch, %0" : : "r"(satp));
+	// asm volatile("csrr %0, sscratch" : "=r"(satp) :);
+	// printk("stap=%016lx\n", satp);
+	
+	// printk("status=%016lx\n", status);
+	// u_long old_satp;
+	// asm volatile("csrr %0, satp" : "=r"(old_satp) :);
+	// printk("oldstap=%016lx\n", old_satp);
+	// asm volatile("csrw satp, %0" : : "r"(base_pgdir >> 12));
+	// printk("nyan!\n");
+	// printk("base is %016lx\n", base_pgdir);
+	// printk("%016lx!\n", *(u_long *)base_pgdir);
+	// printk("%016lx!\n", *((u_long *)base_pgdir + 1));
+	// printk("%016lx!\n", *((u_long *)base_pgdir + 2));
+	// printk("%016lx!\n", *((u_long *)base_pgdir + 2) << 2);
+	// printk("%016lx!\n", *((u_long *)base_pgdir + 3));
+	// printk("%016lx!\n", *((u_long *)base_pgdir + 4));
+	asm volatile("csrw satp, %0" : : "r"(satp));
+	
+	printk("OK!\n");
+
+	asid_bitmap[0] |= 1; // 占用 asid == 0
 }
 
 /* Overview:
@@ -204,23 +244,44 @@ static int env_setup_vm(struct Env *e) {
 	 * Hint:
 	 *   You can get the kernel address of a specified physical page using 'page2kva'.
 	 */
-	struct Page *p;
-	try(page_alloc(&p));
-	/* Exercise 3.3: Your code here. */
-	p->pp_ref++;
-	e->env_pgdir = (Pde *)page2kva(p);
+	// struct Page *p;
+	// try(page_alloc(&p));
+	// /* Exercise 3.3: Your code here. */
+	// p->pp_ref++;
+	// // TODO: pgdir
+	// e->env_pgdir = (Pde *)page2kva(p);
 
 	/* Step 2: Copy the template page directory 'base_pgdir' to 'e->env_pgdir'. */
 	/* Hint:
 	 *   As a result, the address space of all envs is identical in [UTOP, UVPT).
 	 *   See include/mmu.h for layout.
 	 */
-	memcpy(e->env_pgdir + PDX(UTOP), base_pgdir + PDX(UTOP),
-	       sizeof(Pde) * (PDX(UVPT) - PDX(UTOP)));
+	// TODO: share page
+	// memcpy(e->env_pgdir + PDX(UTOP), base_pgdir + PDX(UTOP),
+	//        sizeof(Pde) * (PDX(UVPT) - PDX(UTOP)));
 
 	/* Step 3: Map its own page table at 'UVPT' with readonly permission.
 	 * As a result, user programs can read its page table through 'UVPT' */
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_V;
+	// e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_V;
+	// memcpy(e->env_pgdir + PDX(UTOP), base_pgdir + PDX(UTOP),
+	//         sizeof(Pde) * (PDX(UVPT) - PDX(UTOP)));
+	// e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_V;
+	
+
+	// printk("nyan!");
+	alloc_pgdir(&e->env_pgdir);
+	// printk("pgdir is %016lx\n", e->env_pgdir);
+	// printk("%016lx\n", (u_long *)e->env_pgdir);
+
+	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
+	((u_long *)e->env_pgdir)[PPT] = PA2PTE(e->env_pgdir) | PTE_V;
+	
+	// ((u_long *)e->env_pgdir)[PENV] = e->env_pgdir | PTE_V;
+	// printk("pgdir is %016lx\n", e->env_pgdir);
+	// debug_page(&base_pgdir);
+	// debug_page(&e->env_pgdir);
+	
+	// printk("pgdir is %016lx\n", e->env_pgdir);
 	return 0;
 }
 
@@ -266,6 +327,8 @@ int env_alloc(struct Env **new, u_int parent_id) {
 	 *   Use 'asid_alloc' to allocate a free asid.
 	 *   Use 'mkenvid' to allocate a free envid.
 	 */
+	e->env_pgdir = 0;
+
 	e->env_user_tlb_mod_entry = 0; // for lab4
 	e->env_runs = 0;	       // for lab6
 	/* Exercise 3.4: Your code here. (3/4) */
@@ -275,7 +338,9 @@ int env_alloc(struct Env **new, u_int parent_id) {
 
 	/* Step 4: Initialize the sp and 'cp0_status' in 'e->env_tf'. */
 	// Timer interrupt (STATUS_IM4) will be enabled.
-	e->env_tf.cp0_status = STATUS_IM4 | STATUS_KUp | STATUS_IEp;
+	// lab 2: sstatus
+	e->env_tf.sie = SIE_UTIE;
+	e->env_tf.sstatus = SSTATUS_UIE;
 	// Keep space for 'argc' and 'argv'.
 	e->env_tf.regs[29] = USTACKTOP - sizeof(int) - sizeof(char **);
 
@@ -307,19 +372,25 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
 
 	/* Step 1: Allocate a page with 'page_alloc'. */
 	/* Exercise 3.5: Your code here. (1/2) */
-	try(page_alloc(&p));
+	// try(page_alloc(&p));
 
 	/* Step 2: If 'src' is not NULL, copy the 'len' bytes started at 'src' into 'offset' at this
 	 * page. */
 	// Hint: You may want to use 'memcpy'.
-	if (src != NULL) {
-		/* Exercise 3.5: Your code here. (2/2) */
-		memcpy((void *)(page2kva(p) + offset), src, len);
+	// if (src != NULL) {
+	// 	/* Exercise 3.5: Your code here. (2/2) */
+	// 	memcpy((void *)(page2kva(p) + offset), src, len);
 
-	}
+	// }
 
 	/* Step 3: Insert 'p' into 'env->env_pgdir' at 'va' with 'perm'. */
-	return page_insert(env->env_pgdir, env->env_asid, p, va, perm);
+	try(alloc_page(&env->env_pgdir, env->env_asid, va, perm));
+	u_long pa = get_pa(&env->env_pgdir, va);
+	if (src != NULL) {
+		memcpy((void *)(pa + offset), src, len);
+	}
+	return 0;
+	// return page_insert(env->env_pgdir, env->env_asid, p, va, perm);
 }
 
 /* Overview:
@@ -350,7 +421,8 @@ static void load_icode(struct Env *e, const void *binary, size_t size) {
 
 	/* Step 3: Set 'e->env_tf.cp0_epc' to 'ehdr->e_entry'. */
 	/* Exercise 3.6: Your code here. */
-	e->env_tf.cp0_epc = ehdr->e_entry;
+	// lab 2: sepc
+	e->env_tf.sepc = ehdr->e_entry;
 
 }
 
@@ -377,6 +449,12 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
 	 * 'env_sched_list' using 'TAILQ_INSERT_HEAD'. */
 	/* Exercise 3.7: Your code here. (3/3) */
 	load_icode(e, binary, size);
+	
+	struct Page *pp;
+	try(page_alloc(&pp));
+	e->env_pgdir = page2pa(pp);
+	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
+	// map_pages(&e->env_pgdir, e->env_asid, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X); // map 物理地址，稍后可以优化
 	TAILQ_INSERT_HEAD(&env_sched_list, e, env_sched_link);
 
 	return e;
@@ -392,34 +470,36 @@ void env_free(struct Env *e) {
 	/* Hint: Note the environment's demise.*/
 	printk("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
-	/* Hint: Flush all mapped pages in the user portion of the address space */
-	for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
-		/* Hint: only look at mapped page tables. */
-		if (!(e->env_pgdir[pdeno] & PTE_V)) {
-			continue;
-		}
-		/* Hint: find the pa and va of the page table. */
-		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (Pte *)KADDR(pa);
-		/* Hint: Unmap all PTEs in this page table. */
-		for (pteno = 0; pteno <= PTX(~0); pteno++) {
-			if (pt[pteno] & PTE_V) {
-				page_remove(e->env_pgdir, e->env_asid,
-					    (pdeno << PDSHIFT) | (pteno << PGSHIFT));
-			}
-		}
-		/* Hint: free the page table itself. */
-		e->env_pgdir[pdeno] = 0;
-		page_decref(pa2page(pa));
-		/* Hint: invalidate page table in TLB */
-		tlb_invalidate(e->env_asid, UVPT + (pdeno << PGSHIFT));
-	}
-	/* Hint: free the page directory. */
-	page_decref(pa2page(PADDR(e->env_pgdir)));
-	/* Hint: free the ASID */
+	destroy_pgdir(&e->env_pgdir, e->env_asid);
 	asid_free(e->env_asid);
-	/* Hint: invalidate page directory in TLB */
-	tlb_invalidate(e->env_asid, UVPT + (PDX(UVPT) << PGSHIFT));
+	/* Hint: Flush all mapped pages in the user portion of the address space */
+	// for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
+	// 	/* Hint: only look at mapped page tables. */
+	// 	if (!(e->env_pgdir[pdeno] & PTE_V)) {
+	// 		continue;
+	// 	}
+	// 	/* Hint: find the pa and va of the page table. */
+	// 	pa = PTE_ADDR(e->env_pgdir[pdeno]);
+	// 	pt = (Pte *)KADDR(pa);
+	// 	/* Hint: Unmap all PTEs in this page table. */
+	// 	for (pteno = 0; pteno <= PTX(~0); pteno++) {
+	// 		if (pt[pteno] & PTE_V) {
+	// 			page_remove(e->env_pgdir, e->env_asid,
+	// 				    (pdeno << PDSHIFT) | (pteno << PGSHIFT));
+	// 		}
+	// 	}
+	// 	/* Hint: free the page table itself. */
+	// 	e->env_pgdir[pdeno] = 0;
+	// 	page_decref(pa2page(pa));
+	// 	/* Hint: invalidate page table in TLB */
+	// 	tlb_invalidate(e->env_asid, UVPT + (pdeno << PGSHIFT));
+	// }
+	// /* Hint: free the page directory. */
+	// page_decref(pa2page(PADDR(e->env_pgdir)));
+	// /* Hint: free the ASID */
+	// asid_free(e->env_asid);
+	// /* Hint: invalidate page directory in TLB */
+	// tlb_invalidate(e->env_asid, UVPT + (PDX(UVPT) << PGSHIFT));
 	/* Hint: return the environment to the free list. */
 	e->env_status = ENV_FREE;
 	LIST_INSERT_HEAD((&env_free_list), (e), env_link);
@@ -441,6 +521,9 @@ void env_destroy(struct Env *e) {
 	}
 }
 
+#define MOS_SCHED_MAX_TICKS 100
+#define MOS_SCHED_END_PC 0x500000
+
 /* Overview:
  *   This function is depended by our judge framework. Please do not modify it.
  */
@@ -456,7 +539,8 @@ static inline void pre_env_run(struct Env *e) {
 #endif
 #ifdef MOS_SCHED_END_PC
 	struct Trapframe *tf = (struct Trapframe *)KSTACKTOP - 1;
-	u_int epc = tf->cp0_epc;
+	// printk("tf=%016lx\n", tf);
+	u_long epc = tf->sepc;
 	if (epc == MOS_SCHED_END_PC) {
 		printk("env %08x reached end pc: 0x%08x, $v0=0x%08x\n", e->env_id, epc,
 		       tf->regs[2]);
@@ -517,99 +601,123 @@ void env_run(struct Env *e) {
 	// printk("%08x\n", e);
 	// print_stackframe(10);
 	// printk("pa=%08x\n", get_pa(e->env_pgdir, 0x7f3fdff8));
-	env_pop_tf(&e->env_tf, e->env_asid);
+	// env_pop_tf(&e->env_tf, e->env_asid);
+	// lab 2: tlb
 
+
+	// print_tf(&e->env_tf);
+	asm volatile("csrw sepc, %0" : : "r"(e->env_tf.sepc));
+	u_long status;
+	asm volatile("csrr %0, sstatus" : "=r"(status));
+	// printk("sstatus = %016lx\n", status);
+	asm volatile("csrw sstatus, %0" : : "r"(status & 0xfffffffffffffeff));
+	// asm volatile("csrr %0, sstatus" : "=r"(status));
+	// printk("sstatus = %016lx\n", status);
+
+	
+
+	asm volatile("csrw satp, %0" : : "r"(SATP_MODE_SV39 & SATP_MODE | (e->env_asid << 44) & SATP_ASID | (e->env_pgdir >> 12) & SATP_PPN));
+
+	int r = sbi_set_timer(10000000);
+	asm volatile("csrs sie, %0" : : "r"(SIE_STIE));
+	asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
+	asm volatile("add sp, %0, zero" : : "r"(&e->env_tf));
+	asm volatile("j ret_from_exception");
 }
 
 void env_check() {
-	struct Env *pe, *pe0, *pe1, *pe2;
-	struct Env_list fl;
-	u_long page_addr;
-	/* should be able to allocate three envs */
-	pe0 = 0;
-	pe1 = 0;
-	pe2 = 0;
-	assert(env_alloc(&pe0, 0) == 0);
-	assert(env_alloc(&pe1, 0) == 0);
-	assert(env_alloc(&pe2, 0) == 0);
 
-	assert(pe0);
-	assert(pe1 && pe1 != pe0);
-	assert(pe2 && pe2 != pe1 && pe2 != pe0);
-
-	/* temporarily steal the rest of the free envs */
-	fl = env_free_list;
-	/* now this env_free list must be empty! */
-	LIST_INIT(&env_free_list);
-
-	/* should be no free memory */
-	assert(env_alloc(&pe, 0) == -E_NO_FREE_ENV);
-
-	/* recover env_free_list */
-	env_free_list = fl;
-
-	printk("pe0->env_id %d\n", pe0->env_id);
-	printk("pe1->env_id %d\n", pe1->env_id);
-	printk("pe2->env_id %d\n", pe2->env_id);
-
-	assert(pe0->env_id == 2048);
-	assert(pe1->env_id == 4097);
-	assert(pe2->env_id == 6146);
-	printk("env_init() work well!\n");
-
-	/* 'UENVS' and 'UPAGES' should have been correctly mapped in *template* page directory
-	 * 'base_pgdir'. */
-	for (page_addr = 0; page_addr < npage * sizeof(struct Page); page_addr += BY2PG) {
-		assert(va2pa(base_pgdir, UPAGES + page_addr) == PADDR(pages) + page_addr);
-	}
-	for (page_addr = 0; page_addr < NENV * sizeof(struct Env); page_addr += BY2PG) {
-		assert(va2pa(base_pgdir, UENVS + page_addr) == PADDR(envs) + page_addr);
-	}
-	/* check env_setup_vm() work well */
-	printk("pe1->env_pgdir %x\n", pe1->env_pgdir);
-
-	assert(pe2->env_pgdir[PDX(UTOP)] == base_pgdir[PDX(UTOP)]);
-	assert(pe2->env_pgdir[PDX(UTOP) - 1] == 0);
-	printk("env_setup_vm passed!\n");
-
-	printk("pe2`s sp register %x\n", pe2->env_tf.regs[29]);
-
-	/* free all env allocated in this function */
-	TAILQ_INSERT_TAIL(&env_sched_list, pe0, env_sched_link);
-	TAILQ_INSERT_TAIL(&env_sched_list, pe1, env_sched_link);
-	TAILQ_INSERT_TAIL(&env_sched_list, pe2, env_sched_link);
-
-	env_free(pe2);
-	env_free(pe1);
-	env_free(pe0);
-
-	printk("env_check() succeeded!\n");
 }
 
-void envid2env_check() {
-	struct Env *pe, *pe0, *pe2;
-	assert(env_alloc(&pe0, 0) == 0);
-	assert(env_alloc(&pe2, 0) == 0);
-	int re;
-	pe2->env_status = ENV_FREE;
-	re = envid2env(pe2->env_id, &pe, 0);
+// void env_check() {
+// 	struct Env *pe, *pe0, *pe1, *pe2;
+// 	struct Env_list fl;
+// 	u_long page_addr;
+// 	/* should be able to allocate three envs */
+// 	pe0 = 0;
+// 	pe1 = 0;
+// 	pe2 = 0;
+// 	assert(env_alloc(&pe0, 0) == 0);
+// 	assert(env_alloc(&pe1, 0) == 0);
+// 	assert(env_alloc(&pe2, 0) == 0);
 
-	assert(re == -E_BAD_ENV);
+// 	assert(pe0);
+// 	assert(pe1 && pe1 != pe0);
+// 	assert(pe2 && pe2 != pe1 && pe2 != pe0);
 
-	pe2->env_status = ENV_RUNNABLE;
-	re = envid2env(pe2->env_id, &pe, 0);
+// 	/* temporarily steal the rest of the free envs */
+// 	fl = env_free_list;
+// 	/* now this env_free list must be empty! */
+// 	LIST_INIT(&env_free_list);
 
-	assert(pe->env_id == pe2->env_id && re == 0);
+// 	/* should be no free memory */
+// 	assert(env_alloc(&pe, 0) == -E_NO_FREE_ENV);
 
-	curenv = pe0;
-	re = envid2env(pe2->env_id, &pe, 1);
-	assert(re == -E_BAD_ENV);
-	printk("envid2env() work well!\n");
-}
+// 	/* recover env_free_list */
+// 	env_free_list = fl;
+
+// 	printk("pe0->env_id %d\n", pe0->env_id);
+// 	printk("pe1->env_id %d\n", pe1->env_id);
+// 	printk("pe2->env_id %d\n", pe2->env_id);
+
+// 	assert(pe0->env_id == 2048);
+// 	assert(pe1->env_id == 4097);
+// 	assert(pe2->env_id == 6146);
+// 	printk("env_init() work well!\n");
+
+// 	/* 'UENVS' and 'UPAGES' should have been correctly mapped in *template* page directory
+// 	 * 'base_pgdir'. */
+// 	for (page_addr = 0; page_addr < npage * sizeof(struct Page); page_addr += BY2PG) {
+// 		assert(va2pa(base_pgdir, UPAGES + page_addr) == PADDR(pages) + page_addr);
+// 	}
+// 	for (page_addr = 0; page_addr < NENV * sizeof(struct Env); page_addr += BY2PG) {
+// 		assert(va2pa(base_pgdir, UENVS + page_addr) == PADDR(envs) + page_addr);
+// 	}
+// 	/* check env_setup_vm() work well */
+// 	printk("pe1->env_pgdir %x\n", pe1->env_pgdir);
+
+// 	assert(pe2->env_pgdir[PDX(UTOP)] == base_pgdir[PDX(UTOP)]);
+// 	assert(pe2->env_pgdir[PDX(UTOP) - 1] == 0);
+// 	printk("env_setup_vm passed!\n");
+
+// 	printk("pe2`s sp register %x\n", pe2->env_tf.regs[29]);
+
+// 	/* free all env allocated in this function */
+// 	TAILQ_INSERT_TAIL(&env_sched_list, pe0, env_sched_link);
+// 	TAILQ_INSERT_TAIL(&env_sched_list, pe1, env_sched_link);
+// 	TAILQ_INSERT_TAIL(&env_sched_list, pe2, env_sched_link);
+
+// 	env_free(pe2);
+// 	env_free(pe1);
+// 	env_free(pe0);
+
+// 	printk("env_check() succeeded!\n");
+// }
+
+// void envid2env_check() {
+// 	struct Env *pe, *pe0, *pe2;
+// 	assert(env_alloc(&pe0, 0) == 0);
+// 	assert(env_alloc(&pe2, 0) == 0);
+// 	int re;
+// 	pe2->env_status = ENV_FREE;
+// 	re = envid2env(pe2->env_id, &pe, 0);
+
+// 	assert(re == -E_BAD_ENV);
+
+// 	pe2->env_status = ENV_RUNNABLE;
+// 	re = envid2env(pe2->env_id, &pe, 0);
+
+// 	assert(pe->env_id == pe2->env_id && re == 0);
+
+// 	curenv = pe0;
+// 	re = envid2env(pe2->env_id, &pe, 1);
+// 	assert(re == -E_BAD_ENV);
+// 	printk("envid2env() work well!\n");
+// }
 
 void debug_env() {
-	printk("-----------------------------------env------------------------------------\n");
-	printk("| id        status       parent    asid      pgdir     priority  index   |\n");
+	printk("---------------------------------------env----------------------------------------\n");
+	printk("| id        status       parent    asid      pgdir             priority  index   |\n");
 	for (int i = 0; i < NENV; i++) {
 		struct Env *e = &envs[i];
 		if (e->env_id) {
@@ -633,7 +741,7 @@ void debug_env() {
 			}
 			printk("%08x  ", e->env_asid);
 			if (e->env_pgdir) {
-				printk("%08x  ", e->env_pgdir);
+				printk("%016lx  ", e->env_pgdir);
 			} else {
 				printk("          ");
 			}
@@ -641,17 +749,17 @@ void debug_env() {
 			printk("%-8x|\n", e - envs);
 		}
 	}
-	printk("--------------------------------------------------------------------------\n");
+	printk("----------------------------------------------------------------------------------\n");
 }
 
 void print_env(struct Env* e) {
-	printk("--------------------------------print env---------------------------------\n");
+	printk("------------------------------------print env-------------------------------------\n");
 	if (!e) {
 		printk("|                                no env!                                 |\n");
 		return;
 	}
 	if (e->env_id) {
-		printk("| id        status       parent    asid      pgdir     priority  index   |\n");
+		printk("| id        status       parent    asid      pgdir             priority  index   |\n");
 		if (e == curenv) {
 			printk("|*");
 		} else {
@@ -672,19 +780,19 @@ void print_env(struct Env* e) {
 			}
 			printk("%08x  ", e->env_asid);
 			if (e->env_pgdir) {
-				printk("%08x  ", e->env_pgdir);
+				printk("%016lx  ", e->env_pgdir);
 			} else {
 				printk("          ");
 			}
 			printk("%-8x  ", e->env_pri);
 			printk("%-8x|\n", e - envs);
 	}
-	printk("--------------------------------------------------------------------------\n");
+	printk("----------------------------------------------------------------------------------\n");
 }
 
 void debug_sched() {
-	printk("----------------------------------sched-----------------------------------\n");
-	printk("| id        status       parent    asid      pgdir     priority  index   |\n");
+	printk("--------------------------------------sched---------------------------------------\n");
+	printk("| id        status       parent    asid      pgdir             priority  index   |\n");
 	struct Env *e;
 	TAILQ_FOREACH (e, &env_sched_list, env_sched_link) {
 		if (e->env_id) {
@@ -708,7 +816,7 @@ void debug_sched() {
 			}
 			printk("%08x  ", e->env_asid);
 			if (e->env_pgdir) {
-				printk("%08x  ", e->env_pgdir);
+				printk("%016lx  ", e->env_pgdir);
 			} else {
 				printk("          ");
 			}
@@ -716,7 +824,7 @@ void debug_sched() {
 			printk("%-8x|\n", e - envs);
 		}
 	}
-	printk("--------------------------------------------------------------------------\n");
+	printk("----------------------------------------------------------------------------------\n");
 }
 
 void debug_elf(const void *binary, size_t size) {
@@ -762,66 +870,9 @@ void debug_elf(const void *binary, size_t size) {
 	printk("--------------------------------------------------------------------------------\n");
 }
 
-void print_tff(struct Trapframe *tf) {
-	u_long zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, 
-	s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, fp, ra;
-	u_long badva, sr, cause, epc;
-	zero = tf->regs[0];
-	at = tf->regs[1];
-	v0 = tf->regs[2];
-	v1 = tf->regs[3];
-	a0 = tf->regs[4];
-	a1 = tf->regs[5];
-	a2 = tf->regs[6];
-	a3 = tf->regs[7];
-	t0 = tf->regs[8];
-	t1 = tf->regs[9];
-	t2 = tf->regs[10];
-	t3 = tf->regs[11];
-	t4 = tf->regs[12];
-	t5 = tf->regs[13];
-	t6 = tf->regs[14];
-	t7 = tf->regs[15];
-	s0 = tf->regs[16];
-	s1 = tf->regs[17];
-	s2 = tf->regs[18];
-	s3 = tf->regs[19];
-	s4 = tf->regs[20];
-	s5 = tf->regs[21];
-	s6 = tf->regs[22];
-	s7 = tf->regs[23];
-	t8 = tf->regs[24];
-	t9 = tf->regs[25];
-	k0 = tf->regs[26];
-	k1 = tf->regs[27];
-	gp = tf->regs[28];
-	sp = tf->regs[29];
-	fp = tf->regs[30];
-	ra = tf->regs[31];
-	badva = tf->cp0_badvaddr;
-	sr = tf->cp0_status;
-	cause = tf->cp0_cause;
-	epc = tf->cp0_epc;
-
-	printk("------trapframe at %08x------\n"
-		   "zero:%08x  at:  %08x  v0:  %08x  v1:  %08x\n"
-	       "a0:  %08x  a1:  %08x  a2:  %08x  a3:  %08x\n"
-	       "t0:  %08x  t1:  %08x  t2   %08x  t3:  %08x\n"
-		   "t4:  %08x  t5:  %08x  t6   %08x  t7:  %08x\n"
-	       "s0:  %08x  s1:  %08x  s2:  %08x  s3:  %08x\n"
-		   "s4:  %08x  s5:  %08x  s6:  %08x  s7:  %08x\n"
-		   "s8:  %08x  s9:  %08x  k0:  %08x  k1:  %08x\n"
-		   "gp:  %08x  sp:  %08x  fp:  %08x  ra:  %08x\n"
-	       "BadAddr: %08x  status:  %08x  cause:   %08x  epc: %08x\n",
-		   tf, 
-	       zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, 
-		   s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, fp, ra, 
-		   badva, sr, cause, epc);
-}
-
 __attribute__((noinline)) void *get_pc() {
     void *pc;
-    asm volatile ("move %0, $ra" : "=r"(pc));
+    asm volatile ("add %0, ra, zero" : "=r"(pc));
     return pc;
 }
 

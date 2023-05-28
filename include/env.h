@@ -22,7 +22,7 @@ struct Env {
 	u_int env_asid;		  // ASID
 	u_int env_parent_id;	  // env_id of this env's parent
 	u_int env_status;	  // Status of the environment
-	Pde *env_pgdir;		  // Kernel virtual address of page dir
+	u_long env_pgdir;		  // Kernel virtual address of page dir
 	TAILQ_ENTRY(Env) env_sched_link;
 	u_int env_pri;
 	// Lab 4 IPC

@@ -1,5 +1,6 @@
-#include <asm/cp0regdef.h>
+#include <asm/csrdef.h>
 #include <asm/regdef.h>
+#include <asm/sv39.h>
 
 /*
  * LEAF - declare leaf routine
@@ -19,9 +20,9 @@
 	.globl symbol;                                                                             \
 	.align 2;                                                                                  \
 	.type symbol, @function;                                                                   \
-	.ent symbol;                                                                               \
+	/*.ent symbol;*/                                                                               \
 	symbol:                                                                                    \
-	.frame sp, framesize, rpc
+	/*.frame sp, framesize, rpc*/
 
 /*
  * END - mark end of function

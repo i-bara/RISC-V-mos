@@ -5,7 +5,11 @@ ENTRY(_start)
 SECTIONS {
     kernel_start = .;
 
-    start 0x80200000 : { init/start.o }
+    . = 0x00000000801f0000;
+	
+
+
+    start 0x0000000080200000 : { init/start.o }
 
     .text : {    
         *(.boot)
@@ -20,6 +24,11 @@ SECTIONS {
         *(.bss .bss* .sbss .sbss*)
     }
     bss_end = .;
-    . = 0x80600000;
-    end = . ;
+
+    . = 0x0000000081000000;
+    exc_gen_entry = .;
+    .exc_gen_entry : { *(.text.exc_gen_entry) }
+
+    . = 0x0000000081100000;
+    end = .;
 }

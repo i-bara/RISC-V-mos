@@ -4,219 +4,356 @@
 
 // clang-format off
 .macro SAVE_ALL
-.set noreorder
-.set noat
-	move    k0, sp
-.set reorder
-	bltz    sp, 1f
-	li      sp, KSTACKTOP
-.set noreorder
-1:
-	subu    sp, sp, TF_SIZE
-	sw      k0, TF_REG29(sp)
-	mfc0    k0, CP0_STATUS
-	sw      k0, TF_STATUS(sp)
-	mfc0    k0, CP0_CAUSE
-	sw      k0, TF_CAUSE(sp)
-	mfc0    k0, CP0_EPC
-	sw      k0, TF_EPC(sp)
-	mfc0    k0, CP0_BADVADDR
-	sw      k0, TF_BADVADDR(sp)
-	mfhi    k0
-	sw      k0, TF_HI(sp)
-	mflo    k0
-	sw      k0, TF_LO(sp)
-	sw      $0, TF_REG0(sp)
-	sw      $1, TF_REG1(sp)
-	sw      $2, TF_REG2(sp)
-	sw      $3, TF_REG3(sp)
-	sw      $4, TF_REG4(sp)
-	sw      $5, TF_REG5(sp)
-	sw      $6, TF_REG6(sp)
-	sw      $7, TF_REG7(sp)
-	sw      $8, TF_REG8(sp)
-	sw      $9, TF_REG9(sp)
-	sw      $10, TF_REG10(sp)
-	sw      $11, TF_REG11(sp)
-	sw      $12, TF_REG12(sp)
-	sw      $13, TF_REG13(sp)
-	sw      $14, TF_REG14(sp)
-	sw      $15, TF_REG15(sp)
-	sw      $16, TF_REG16(sp)
-	sw      $17, TF_REG17(sp)
-	sw      $18, TF_REG18(sp)
-	sw      $19, TF_REG19(sp)
-	sw      $20, TF_REG20(sp)
-	sw      $21, TF_REG21(sp)
-	sw      $22, TF_REG22(sp)
-	sw      $23, TF_REG23(sp)
-	sw      $24, TF_REG24(sp)
-	sw      $25, TF_REG25(sp)
-	sw      $26, TF_REG26(sp)
-	sw      $27, TF_REG27(sp)
-	sw      $28, TF_REG28(sp)
-	sw      $30, TF_REG30(sp)
-	sw      $31, TF_REG31(sp)
-.set at
-.set reorder
+// .set noreorder
+// .set noat
+// 	csrw    sscratch, sp
+// .set reorder
+// 	bltz    sp, 1f
+// 	li      sp, KSTACKTOP
+// .set noreorder
+// 1:
+	sd		ra, TF_REG1 - TF_SIZE(sp)
+	sd      sp, TF_REG2 - TF_SIZE(sp)
+	addi    sp, sp, -TF_SIZE
+
+	csrr	ra, sie
+	sd		ra, TF_SIE(sp)
+	csrr	ra, sip
+	sd		ra, TF_SIP(sp)
+	csrr	ra, sepc
+	sd		ra, TF_SEPC(sp)
+	csrr	ra, stvec
+	sd		ra, TF_STVEC(sp)
+	csrr	ra, scause
+	sd		ra, TF_SCAUSE(sp)
+	csrr	ra, stval
+	sd		ra, TF_STVAL(sp)
+	csrr	ra, sstatus
+	sd		ra, TF_SSTATUS(sp)
+	csrr	ra, sscratch
+	sd		ra, TF_SSCRATCH(sp)
+
+	sd      x0, TF_REG0(sp)
+
+	sd      x3, TF_REG3(sp)
+	sd      x4, TF_REG4(sp)
+	sd      x5, TF_REG5(sp)
+	sd      x6, TF_REG6(sp)
+	sd      x7, TF_REG7(sp)
+	sd      x8, TF_REG8(sp)
+	sd      x9, TF_REG9(sp)
+	sd      x10, TF_REG10(sp)
+	sd      x11, TF_REG11(sp)
+	sd      x12, TF_REG12(sp)
+	sd      x13, TF_REG13(sp)
+	sd      x14, TF_REG14(sp)
+	sd      x15, TF_REG15(sp)
+	sd      x16, TF_REG16(sp)
+	sd      x17, TF_REG17(sp)
+	sd      x18, TF_REG18(sp)
+	sd      x19, TF_REG19(sp)
+	sd      x20, TF_REG20(sp)
+	sd      x21, TF_REG21(sp)
+	sd      x22, TF_REG22(sp)
+	sd      x23, TF_REG23(sp)
+	sd      x24, TF_REG24(sp)
+	sd      x25, TF_REG25(sp)
+	sd      x26, TF_REG26(sp)
+	sd      x27, TF_REG27(sp)
+	sd      x28, TF_REG28(sp)
+	sd      x29, TF_REG29(sp)
+	sd      x30, TF_REG30(sp)
+	sd      x31, TF_REG31(sp)
+// .set at
+// .set reorder
 .endm
 /*
  * Note that we restore the IE flags from stack. This means
  * that a modified IE mask will be nullified.
  */
 .macro RESTORE_SOME
-.set noreorder
-.set noat
-	lw      v0, TF_STATUS(sp)
-	mtc0    v0, CP0_STATUS
-	lw      v1, TF_LO(sp)
-	mtlo    v1
-	lw      v0, TF_HI(sp)
-	lw      v1, TF_EPC(sp)
-	mthi    v0
-	mtc0    v1, CP0_EPC
-	lw      $31, TF_REG31(sp)
-	lw      $30, TF_REG30(sp)
-	lw      $28, TF_REG28(sp)
-	lw      $25, TF_REG25(sp)
-	lw      $24, TF_REG24(sp)
-	lw      $23, TF_REG23(sp)
-	lw      $22, TF_REG22(sp)
-	lw      $21, TF_REG21(sp)
-	lw      $20, TF_REG20(sp)
-	lw      $19, TF_REG19(sp)
-	lw      $18, TF_REG18(sp)
-	lw      $17, TF_REG17(sp)
-	lw      $16, TF_REG16(sp)
-	lw      $15, TF_REG15(sp)
-	lw      $14, TF_REG14(sp)
-	lw      $13, TF_REG13(sp)
-	lw      $12, TF_REG12(sp)
-	lw      $11, TF_REG11(sp)
-	lw      $10, TF_REG10(sp)
-	lw      $9, TF_REG9(sp)
-	lw      $8, TF_REG8(sp)
-	lw      $7, TF_REG7(sp)
-	lw      $6, TF_REG6(sp)
-	lw      $5, TF_REG5(sp)
-	lw      $4, TF_REG4(sp)
-	lw      $3, TF_REG3(sp)
-	lw      $2, TF_REG2(sp)
-	lw      $1, TF_REG1(sp)
-.set at
-.set reorder
+// .set noreorder
+// .set noat
+	ld		ra, TF_SIE(sp)
+	csrw	sie, ra
+	ld		ra, TF_SIP(sp)
+	csrw	sip, ra
+	ld		ra, TF_SEPC(sp)
+	csrw	sepc, ra
+	ld		ra, TF_STVEC(sp)
+	csrw	stvec, ra
+	ld		ra, TF_SCAUSE(sp)
+	csrw	scause, ra
+	ld		ra, TF_STVAL(sp)
+	csrw	stval, ra
+	ld		ra, TF_SSTATUS(sp)
+	csrw	sstatus, ra
+	ld		ra, TF_SSCRATCH(sp)
+	csrw	sscratch, ra
+
+	ld      x31, TF_REG31(sp)
+	ld      x30, TF_REG30(sp)
+	ld      x29, TF_REG29(sp)
+	ld      x28, TF_REG28(sp)
+	ld      x27, TF_REG27(sp)
+	ld      x26, TF_REG26(sp)
+	ld      x25, TF_REG25(sp)
+	ld      x24, TF_REG24(sp)
+	ld      x23, TF_REG23(sp)
+	ld      x22, TF_REG22(sp)
+	ld      x21, TF_REG21(sp)
+	ld      x20, TF_REG20(sp)
+	ld      x19, TF_REG19(sp)
+	ld      x18, TF_REG18(sp)
+	ld      x17, TF_REG17(sp)
+	ld      x16, TF_REG16(sp)
+	ld      x15, TF_REG15(sp)
+	ld      x14, TF_REG14(sp)
+	ld      x13, TF_REG13(sp)
+	ld      x12, TF_REG12(sp)
+	ld      x11, TF_REG11(sp)
+	ld      x10, TF_REG10(sp)
+	ld      x9, TF_REG9(sp)
+	ld      x8, TF_REG8(sp)
+	ld      x7, TF_REG7(sp)
+	ld      x6, TF_REG6(sp)
+	ld      x5, TF_REG5(sp)
+	ld      x4, TF_REG4(sp)
+	ld      x3, TF_REG3(sp)
+
+	ld      x1, TF_REG1(sp)
+// .set at
+// .set reorder
 .endm
 
 .macro PRINT_REG reg
-.set noreorder
-.set noat
+// .set noreorder
+// .set noat
 	SAVE_ALL
 		move	a0, \reg
-		jal		print_reg
+		la		t0, print_reg
+		jalr	t0
 	RESTORE_SOME
-	lw		sp, TF_REG29(sp)
+	ld		sp, TF_REG29(sp)
 .endm
 
 .macro PRINT_CP0 cp0
-.set noreorder
-.set noat
+// .set noreorder
+// .set noat
 	SAVE_ALL
 		mfc0	a0, \cp0
-		jal		print_reg
+		la		t0, print_reg
+		jalr	t0
 	RESTORE_SOME
-	lw		sp, TF_REG29(sp)
+	ld		sp, TF_REG29(sp)
 .endm
 
 .macro PRINT_REGS
-.set noreorder
-.set noat
 	SAVE_ALL
-	lw		a0, 0(sp)
-	jal		print_reg_zero
-	lw		a0, 4(sp)
-	jal		print_reg_at
-	lw		a0, 8(sp)
-	jal		print_reg_v0
-	lw		a0, 12(sp)
-	jal		print_reg_v1
-	jal		print_endl
-	lw		a0, 16(sp)
-	jal		print_reg_a0
-	lw		a0, 20(sp)
-	jal		print_reg_a1
-	lw		a0, 24(sp)
-	jal		print_reg_a2
-	lw		a0, 28(sp)
-	jal		print_reg_a3
-	jal		print_endl
-	lw		a0, 32(sp)
-	jal		print_reg_t0
-	lw		a0, 36(sp)
-	jal		print_reg_t1
-	lw		a0, 40(sp)
-	jal		print_reg_t2
-	lw		a0, 44(sp)
-	jal		print_reg_t3
-	jal		print_endl
-	lw		a0, 48(sp)
-	jal		print_reg_t4
-	lw		a0, 52(sp)
-	jal		print_reg_t5
-	lw		a0, 56(sp)
-	jal		print_reg_t6
-	lw		a0, 60(sp)
-	jal		print_reg_t7
-	jal		print_endl
-	lw		a0, 64(sp)
-	jal		print_reg_s0
-	lw		a0, 68(sp)
-	jal		print_reg_s1
-	lw		a0, 72(sp)
-	jal		print_reg_s2
-	lw		a0, 76(sp)
-	jal		print_reg_s3
-	jal		print_endl
-	lw		a0, 80(sp)
-	jal		print_reg_s4
-	lw		a0, 84(sp)
-	jal		print_reg_s5
-	lw		a0, 88(sp)
-	jal		print_reg_s6
-	lw		a0, 92(sp)
-	jal		print_reg_s7
-	jal		print_endl
-	lw		a0, 96(sp)
-	jal		print_reg_t8
-	lw		a0, 100(sp)
-	jal		print_reg_t9
-	lw		a0, 104(sp)
-	jal		print_reg_k0
-	lw		a0, 108(sp)
-	jal		print_reg_k1
-	jal		print_endl
-	lw		a0, 112(sp)
-	jal		print_reg_gp
-	lw		a0, 116(sp)
-	jal		print_reg_sp
-	lw		a0, 120(sp)
-	jal		print_reg_fp
-	lw		a0, 124(sp)
-	jal		print_reg_ra
-	jal		print_endl
-	lw		a0, 128(sp)
-	jal		print_reg_status
-	lw		a0, 132(sp)
-	jal		print_reg_hi
-	lw		a0, 136(sp)
-	jal		print_reg_lo
-	jal		print_endl
-	lw		a0, 140(sp)
-	jal		print_reg_badvaddr
-	lw		a0, 144(sp)
-	jal		print_reg_cause
-	lw		a0, 148(sp)
-	jal		print_reg_epc
-	jal		print_endl
+	ld		a0, TF_REG0(sp)
+	la		t0, print_reg_zero
+	jalr	t0
+	ld		a0, TF_REG1(sp)
+	la		t0, print_reg_at
+	jalr	t0
+	ld		a0, TF_REG2(sp)
+	la		t0, print_reg_v0
+	jalr	t0
+	ld		a0, TF_REG3(sp)
+	la		t0, print_reg_v1
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG4(sp)
+	la		t0, print_reg_a0
+	jalr	t0
+	ld		a0, TF_REG5(sp)
+	la		t0, print_reg_a1
+	jalr	t0
+	ld		a0, TF_REG6(sp)
+	la		t0, print_reg_a2
+	jalr	t0
+	ld		a0, TF_REG7(sp)
+	la		t0, print_reg_a3
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG8(sp)
+	la		t0, print_reg_t0
+	jalr	t0
+	ld		a0, TF_REG9(sp)
+	la		t0, print_reg_t1
+	jalr	t0
+	ld		a0, TF_REG10(sp)
+	la		t0, print_reg_t2
+	jalr	t0
+	ld		a0, TF_REG11(sp)
+	la		t0, print_reg_t3
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG12(sp)
+	la		t0, print_reg_t4
+	jalr	t0
+	ld		a0, TF_REG13(sp)
+	la		t0, print_reg_t5
+	jalr	t0
+	ld		a0, TF_REG14(sp)
+	la		t0, print_reg_t6
+	jalr	t0
+	ld		a0, TF_REG15(sp)
+	la		t0, print_reg_t7
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG16(sp)
+	la		t0, print_reg_s0
+	jalr	t0
+	ld		a0, TF_REG17(sp)
+	la		t0, print_reg_s1
+	jalr	t0
+	ld		a0, TF_REG18(sp)
+	la		t0, print_reg_s2
+	jalr	t0
+	ld		a0, TF_REG19(sp)
+	la		t0, print_reg_s3
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG20(sp)
+	la		t0, print_reg_s4
+	jalr	t0
+	ld		a0, TF_REG21(sp)
+	la		t0, print_reg_s5
+	jalr	t0
+	ld		a0, TF_REG22(sp)
+	la		t0, print_reg_s6
+	jalr	t0
+	ld		a0, TF_REG23(sp)
+	la		t0, print_reg_s7
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG24(sp)
+	la		t0, print_reg_t8
+	jalr	t0
+	ld		a0, TF_REG25(sp)
+	la		t0, print_reg_t9
+	jalr	t0
+	ld		a0, TF_REG26(sp)
+	la		t0, print_reg_k0
+	jalr	t0
+	ld		a0, TF_REG27(sp)
+	la		t0, print_reg_k1
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
+	ld		a0, TF_REG28(sp)
+	la		t0, print_reg_gp
+	jalr	t0
+	ld		a0, TF_REG29(sp)
+	la		t0, print_reg_sp
+	jalr	t0
+	ld		a0, TF_REG30(sp)
+	la		t0, print_reg_fp
+	jalr	t0
+	ld		a0, TF_REG31(sp)
+	la		t0, print_reg_ra
+	jalr	t0
+	la		t0, print_endl
+	jalr	t0
 	RESTORE_SOME
-	lw		sp, TF_REG29(sp)
+	ld		sp, TF_REG2(sp)
 .endm
+
+// .macro PRINT_REGS
+// 	SAVE_ALL
+// 	ld		a0, TF_REG0(sp)
+// 	jal		print_reg_zero
+// 	ld		a0, TF_REG1(sp)
+// 	jal		print_reg_at
+// 	ld		a0, TF_REG2(sp)
+// 	jal		print_reg_v0
+// 	ld		a0, TF_REG3(sp)
+// 	jal		print_reg_v1
+// 	jal		print_endl
+// 	ld		a0, TF_REG4(sp)
+// 	jal		print_reg_a0
+// 	ld		a0, TF_REG5(sp)
+// 	jal		print_reg_a1
+// 	ld		a0, TF_REG6(sp)
+// 	jal		print_reg_a2
+// 	ld		a0, TF_REG7(sp)
+// 	jal		print_reg_a3
+// 	jal		print_endl
+// 	ld		a0, TF_REG8(sp)
+// 	jal		print_reg_t0
+// 	ld		a0, TF_REG9(sp)
+// 	jal		print_reg_t1
+// 	ld		a0, TF_REG10(sp)
+// 	jal		print_reg_t2
+// 	ld		a0, TF_REG11(sp)
+// 	jal		print_reg_t3
+// 	jal		print_endl
+// 	ld		a0, TF_REG12(sp)
+// 	jal		print_reg_t4
+// 	ld		a0, TF_REG13(sp)
+// 	jal		print_reg_t5
+// 	ld		a0, TF_REG14(sp)
+// 	jal		print_reg_t6
+// 	ld		a0, TF_REG15(sp)
+// 	jal		print_reg_t7
+// 	jal		print_endl
+// 	ld		a0, TF_REG16(sp)
+// 	jal		print_reg_s0
+// 	ld		a0, TF_REG17(sp)
+// 	jal		print_reg_s1
+// 	ld		a0, TF_REG18(sp)
+// 	jal		print_reg_s2
+// 	ld		a0, TF_REG19(sp)
+// 	jal		print_reg_s3
+// 	jal		print_endl
+// 	ld		a0, TF_REG20(sp)
+// 	jal		print_reg_s4
+// 	ld		a0, TF_REG21(sp)
+// 	jal		print_reg_s5
+// 	ld		a0, TF_REG22(sp)
+// 	jal		print_reg_s6
+// 	ld		a0, TF_REG23(sp)
+// 	jal		print_reg_s7
+// 	jal		print_endl
+// 	ld		a0, TF_REG24(sp)
+// 	jal		print_reg_t8
+// 	ld		a0, TF_REG25(sp)
+// 	jal		print_reg_t9
+// 	ld		a0, TF_REG26(sp)
+// 	jal		print_reg_k0
+// 	ld		a0, TF_REG27(sp)
+// 	jal		print_reg_k1
+// 	jal		print_endl
+// 	ld		a0, TF_REG28(sp)
+// 	jal		print_reg_gp
+// 	ld		a0, TF_REG29(sp)
+// 	jal		print_reg_sp
+// 	ld		a0, TF_REG30(sp)
+// 	jal		print_reg_fp
+// 	ld		a0, TF_REG31(sp)
+// 	jal		print_reg_ra
+// 	jal		print_endl
+// 	// ld		a0, TF_REG32(sp)
+// 	// jal		print_reg_status
+// 	// ld		a0, 132(sp)
+// 	// jal		print_reg_hi
+// 	// ld		a0, 136(sp)
+// 	// jal		print_reg_lo
+// 	// jal		print_endl
+// 	// ld		a0, 140(sp)
+// 	// jal		print_reg_badvaddr
+// 	// ld		a0, 144(sp)
+// 	// jal		print_reg_cause
+// 	// ld		a0, 148(sp)
+// 	// jal		print_reg_epc
+// 	// jal		print_endl
+// 	RESTORE_SOME
+// 	ld		sp, TF_REG2(sp)
+// .endm

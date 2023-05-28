@@ -1,4 +1,4 @@
-#include <asm/sbi.h>
+#include <sbi.h>
 
 // Base Extension (EID #0x10)
 struct sbiret sbi_get_spec_version(void) {

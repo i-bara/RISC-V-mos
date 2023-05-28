@@ -2,46 +2,48 @@
 #define _MMU_H_
 
 #include <error.h>
+#include <memory.h>
+#include <asm/sv39.h>
 
-#define BY2PG 4096		// bytes to a page
-#define PDMAP (4 * 1024 * 1024) // bytes mapped by a page directory entry
-#define PGSHIFT 12
-#define PDSHIFT 22 // log2(PDMAP)
-#define PDX(va) ((((u_long)(va)) >> 22) & 0x03FF)
-#define PTX(va) ((((u_long)(va)) >> 12) & 0x03FF)
-#define PTE_ADDR(pte) ((u_long)(pte) & ~0xFFF)
+// #define BY2PG 4096		// bytes to a page
+// #define PDMAP (4 * 1024 * 1024) // bytes mapped by a page directory entry
+// #define PGSHIFT 12
+// #define PDSHIFT 22 // log2(PDMAP)
+// #define PDX(va) ((((u_long)(va)) >> 22) & 0x03FF)
+// #define PTX(va) ((((u_long)(va)) >> 12) & 0x03FF)
+// #define PTE_ADDR(pte) ((u_long)(pte) & ~0xFFF)
 
-// Page number field of an address
-#define PPN(va) (((u_long)(va)) >> 12)
-#define VPN(va) (((u_long)(va)) >> 12)
+// // Page number field of an address
+// #define PPN(va) (((u_long)(va)) >> 12)
+// #define VPN(va) (((u_long)(va)) >> 12)
 
-/* Page Table/Directory Entry flags */
+// /* Page Table/Directory Entry flags */
 
-// Global bit. When the G bit in a TLB entry is set, that TLB entry will match solely on the VPN
-// field, regardless of whether the TLB entry’s ASID field matches the value in EntryHi.
-#define PTE_G 0x0100
+// // Global bit. When the G bit in a TLB entry is set, that TLB entry will match solely on the VPN
+// // field, regardless of whether the TLB entry’s ASID field matches the value in EntryHi.
+// #define PTE_G 0x0100
 
-// Valid bit. If 0 any address matching this entry will cause a tlb miss exception (TLBL/TLBS).
-#define PTE_V 0x0200
+// // Valid bit. If 0 any address matching this entry will cause a tlb miss exception (TLBL/TLBS).
+// #define PTE_V 0x0200
 
-// Dirty bit, but really a write-enable bit. 1 to allow writes, 0 and any store using this
-// translation will cause a tlb mod exception (TLB Mod).
-#define PTE_D 0x0400
+// // Dirty bit, but really a write-enable bit. 1 to allow writes, 0 and any store using this
+// // translation will cause a tlb mod exception (TLB Mod).
+// #define PTE_D 0x0400
 
-// Uncacheable bit. 0 to make the access cacheable, 1 for uncacheable.
-#define PTE_N 0x0800
+// // Uncacheable bit. 0 to make the access cacheable, 1 for uncacheable.
+// #define PTE_N 0x0800
 
-// Copy On Write. Reserved for software, used by fork.
-#define PTE_COW 0x0001
+// // Copy On Write. Reserved for software, used by fork.
+// #define PTE_COW 0x0001
 
-// Shared memmory. Reserved for software, used by fork.
-#define PTE_LIBRARY 0x0004
+// // Shared memmory. Reserved for software, used by fork.
+// #define PTE_LIBRARY 0x0004
 
-// Memory segments (32-bit kernel mode addresses)
-#define KUSEG 0x00000000U
-#define KSEG0 0x80000000U
-#define KSEG1 0xA0000000U
-#define KSEG2 0xC0000000U
+// // Memory segments (32-bit kernel mode addresses)
+// #define KUSEG 0x00000000U
+// #define KSEG0 0x80000000U
+// #define KSEG1 0xA0000000U
+// #define KSEG2 0xC0000000U
 
 /*
  * Part 2.  Our conventions.
@@ -92,14 +94,20 @@
  o
 */
 
-#define KERNBASE 0x80010000
+#define PAGE_TABLE 0xc0000000
+#define PPT 0x3
+#define PAGES (ENVS + BY2PG1)
+#define ENVS 0x100000000L
+#define PENVS 0x4
 
-#define KSTACKTOP (ULIM + PDMAP)
+#define KERNBASE 0x80000000 // 原来是 0x80010000
+
+#define KSTACKTOP 0x81000000
 #define ULIM 0x80000000
 
-#define UVPT (ULIM - PDMAP)
-#define UPAGES (UVPT - PDMAP)
-#define UENVS (UPAGES - PDMAP)
+#define UVPT (ULIM - BY2PG2)
+#define UPAGES (UVPT - BY2PG1)
+#define UENVS (UPAGES - BY2PG1)
 
 #define UTOP UENVS
 #define UXSTACKTOP UTOP
