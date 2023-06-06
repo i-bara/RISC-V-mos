@@ -53,11 +53,13 @@ interrupt_handler:
 
 FEXPORT(ret_from_exception)
 	RESTORE_SOME
-	ld      sp, TF_REG2(sp) /* Deallocate stack */
+	csrrw	sp, sscratch, sp /* Deallocate stack */
 	# csrrw	a0, sscratch, a0
 	# li		a0, SATP_MODE_SV39
 	# csrs	satp, a0
 	# csrrw	a0, sscratch, a0
+	
+	// PRINT_REGS
 	sret
 
 # FEXPORT(handle_int)

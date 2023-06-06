@@ -45,7 +45,7 @@ test: clean-and-all
 include mk/tests.mk mk/profiles.mk
 export CC CFLAGS LD LDFLAGS lab
 
-all: $(targets)
+all: $(targets) objdump
 
 $(target_dir):
 	mkdir -p $@
@@ -57,6 +57,7 @@ $(modules): tools
 	$(MAKE) --directory=$@
 
 $(mos_elf): $(modules) $(target_dir)
+	echo $(objects)
 	$(LD) $(LDFLAGS) -o $(mos_elf) -N -T $(link_script) $(objects)
 
 fs-image: $(target_dir) user

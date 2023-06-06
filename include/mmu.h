@@ -105,17 +105,17 @@
 #define KSTACKTOP 0x81000000
 #define ULIM 0x80000000
 
-#define UVPT (ULIM - BY2PG2)
-#define UPAGES (UVPT - BY2PG1)
-#define UENVS (UPAGES - BY2PG1)
+// #define UVPT (ULIM - BY2PG2)
+// #define UPAGES (UVPT - BY2PG1)
+// #define UENVS (UPAGES - BY2PG1)
 
-#define UTOP UENVS
+#define UTOP ULIM
 #define UXSTACKTOP UTOP
 
-#define USTACKTOP (UTOP - 2 * BY2PG)
-#define UTEXT PDMAP
-#define UCOW (UTEXT - BY2PG)
-#define UTEMP (UCOW - BY2PG)
+#define USTACKTOP (UTOP - 2 * PAGE_SIZE)
+#define UTEXT 0x00400000
+#define UCOW 0x003ff000
+#define UTEMP 0x003fe000
 
 #ifndef __ASSEMBLER__
 

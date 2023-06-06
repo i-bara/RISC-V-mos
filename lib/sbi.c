@@ -77,7 +77,12 @@ long sbi_set_timer(uint64_t stime_value) {
     long r;
     asm("li a7, 0x00");
 	asm("li a6, 0");
-	asm("add a0, %0, zero" : "=r"(stime_value) :);
+    asm("li a5, 0");
+    asm("li a4, 0");
+    asm("li a3, 0");
+    asm("li a2, 0");
+    asm("li a1, 0");
+	asm("add a0, %0, zero" : : "r"(stime_value));
 	asm("ecall");
     asm("add %0, a0, zero" : "=r"(r) :);
     return r;

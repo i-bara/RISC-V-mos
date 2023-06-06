@@ -25,13 +25,16 @@ void sys_putchar(int c) {
  * Pre-Condition:
  * 	`s` is base address of the string, and `num` is length of the string.
  */
-int sys_print_cons(const void *s, u_int num) {
-	if (((u_int)s + num) > UTOP || ((u_int)s) >= UTOP || (s > s + num)) {
+int sys_print_cons(const void *s, u_long num) {
+	u_long pa = get_pa(&cur_pgdir, (u_long)s);
+
+	if (/* ((u_long)pa + num) > UTOP || ((u_long)pa) >= UTOP || */ (pa > pa + num)) {
 		return -E_INVAL;
 	}
-	u_int i;
+	
+	u_long i;
 	for (i = 0; i < num; i++) {
-		printcharc(((char *)s)[i]);
+		printcharc(((char *)pa)[i]);
 	}
 	return 0;
 }
@@ -42,7 +45,7 @@ int sys_print_cons(const void *s, u_int num) {
  * Post-Condition:
  * 	return the current environment id
  */
-u_int sys_getenvid(void) {
+u_long sys_getenvid(void) {
 	return curenv->env_id;
 }
 
@@ -75,7 +78,7 @@ void __attribute__((noreturn)) sys_yield(void) {
  *  Returns 0 on success.
  *  Returns the original error if underlying calls fail.
  */
-int sys_env_destroy(u_int envid) {
+int sys_env_destroy(u_long envid) {
 	struct Env *e;
 	try(envid2env(envid, &e, 1));
 
@@ -92,7 +95,7 @@ int sys_env_destroy(u_int envid) {
  *   Returns 0 on success.
  *   Returns the original error if underlying calls fail.
  */
-int sys_set_tlb_mod_entry(u_int envid, u_int func) {
+int sys_set_tlb_mod_entry(u_long envid, u_long func) {
 	struct Env *env;
 
 	/* Step 1: Convert the envid to its corresponding 'struct Env *' using 'envid2env'. */
@@ -113,7 +116,7 @@ static inline int is_illegal_va(u_long va) {
 	return va < UTEMP || va >= UTOP;
 }
 
-static inline int is_illegal_va_range(u_long va, u_int len) {
+static inline int is_illegal_va_range(u_long va, u_long len) {
 	if (len == 0) {
 		return 0;
 	}
@@ -136,27 +139,32 @@ static inline int is_illegal_va_range(u_long va, u_int len) {
  *   You may want to use the following functions:
  *   'envid2env', 'page_alloc', 'page_insert', 'try' (macro)
  */
-int sys_mem_alloc(u_int envid, u_int va, u_int perm) {
+int sys_mem_alloc(u_long envid, u_long va, u_long perm) {
+
 	struct Env *env;
 	struct Page *pp;
 
 	/* Step 1: Check if 'va' is a legal user virtual address using 'is_illegal_va'. */
 	/* Exercise 4.4: Your code here. (1/3) */
+	printk("nyan! %016lx\n", va);
 	if (is_illegal_va(va)) {
 		return -E_INVAL;
 	}
+	printk("nyan!\n");
 
 	/* Step 2: Convert the envid to its corresponding 'struct Env *' using 'envid2env'. */
 	/* Hint: **Always** validate the permission in syscalls! */
 	/* Exercise 4.4: Your code here. (2/3) */
 	try(envid2env(envid, &env, curenv->env_id));
 
-	/* Step 3: Allocate a physical page using 'page_alloc'. */
-	/* Exercise 4.4: Your code here. (3/3) */
-	try(page_alloc(&pp));
+	// /* Step 3: Allocate a physical page using 'page_alloc'. */
+	// /* Exercise 4.4: Your code here. (3/3) */
+	// try(page_alloc(&pp));
 
-	/* Step 4: Map the allocated page at 'va' with permission 'perm' using 'page_insert'. */
-	return page_insert(env->env_pgdir, env->env_asid, pp, va, perm);
+	// /* Step 4: Map the allocated page at 'va' with permission 'perm' using 'page_insert'. */
+	// return page_insert(env->env_pgdir, env->env_asid, pp, va, perm);
+	return alloc_page_user(&env->env_pgdir, env->env_asid, va, perm);
+
 }
 
 /* Overview:
@@ -173,7 +181,7 @@ int sys_mem_alloc(u_int envid, u_int va, u_int perm) {
  *   You may want to use the following functions:
  *   'envid2env', 'page_lookup', 'page_insert'
  */
-int sys_mem_map(u_int srcid, u_int srcva, u_int dstid, u_int dstva, u_int perm) {
+int sys_mem_map(u_long srcid, u_long srcva, u_long dstid, u_long dstva, u_long perm) {
 	struct Env *srcenv;
 	struct Env *dstenv;
 	struct Page *pp;
@@ -196,12 +204,26 @@ int sys_mem_map(u_int srcid, u_int srcva, u_int dstid, u_int dstva, u_int perm) 
 	/* Step 4: Find the physical page mapped at 'srcva' in the address space of 'srcid'. */
 	/* Return -E_INVAL if 'srcva' is not mapped. */
 	/* Exercise 4.5: Your code here. (4/4) */
-	if ((pp = page_lookup(srcenv->env_pgdir, srcva, 0)) == NULL) {
+	// if ((pp = page_lookup(srcenv->env_pgdir, srcva, 0)) == NULL) {
+	// 	return -E_INVAL;
+	// }
+
+	// debug_page_user(&srcenv->env_pgdir);
+	if (is_mapped_page(&srcenv->env_pgdir, srcva) == 0) {
 		return -E_INVAL;
 	}
 
+	u_long pa = get_pa(&srcenv->env_pgdir, srcva);
+	// static int iii = 0;
+	// if (iii == 1) {
+	// 	printk("%016lx\n", dstenv->env_pgdir);
+	// 	debug_page_user(&dstenv->env_pgdir);
+	// }
+	// iii = 1;
+
 	/* Step 5: Map the physical page at 'dstva' in the address space of 'dstid'. */
-	return page_insert(dstenv->env_pgdir, dstenv->env_asid, pp, dstva, perm);
+	// return page_insert(dstenv->env_pgdir, dstenv->env_asid, pp, dstva, perm);
+	return map_page_user(&dstenv->env_pgdir, dstenv->env_asid, dstva, pa, perm);
 }
 
 /* Overview:
@@ -214,7 +236,7 @@ int sys_mem_map(u_int srcid, u_int srcva, u_int dstid, u_int dstva, u_int perm) 
  *   Return -E_INVAL:   'va' is illegal.
  *   Return the original error when underlying calls fail.
  */
-int sys_mem_unmap(u_int envid, u_int va) {
+int sys_mem_unmap(u_long envid, u_long va) {
 	struct Env *e;
 
 	/* Step 1: Check if 'va' is a legal user virtual address using 'is_illegal_va'. */
@@ -228,8 +250,10 @@ int sys_mem_unmap(u_int envid, u_int va) {
 	try(envid2env(envid, &e, curenv->env_id));
 
 	/* Step 3: Unmap the physical page at 'va' in the address space of 'envid'. */
-	page_remove(e->env_pgdir, e->env_asid, va);
-	return 0;
+	// page_remove(e->env_pgdir, e->env_asid, va);
+	// return 0;
+
+	return unmap_page(&e->env_pgdir, e->env_asid, va);
 }
 
 /* Overview:
@@ -257,12 +281,35 @@ int sys_exofork(void) {
 	/* Exercise 4.9: Your code here. (2/4) */
 	e->env_tf = *((struct Trapframe *)KSTACKTOP - 1);
 
-	/* Step 3: Set the new env's 'env_tf.regs[2]' to 0 to indicate the return value in child. */
+	/* Step 3: Set the new env's 'env_tf.regs[10]' to 0 to indicate the return value in child. */
 	/* Exercise 4.9: Your code here. (3/4) */
-	e->env_tf.regs[2] = 0;
+	e->env_tf.regs[10] = 0;
 
 	/* Step 4: Set up the new env's 'env_status' and 'env_pri'.  */
 	/* Exercise 4.9: Your code here. (4/4) */
+	extern u_long base_pgdir;
+	if (!e->env_pgdir) {
+		struct Page *pp;
+		try(page_alloc(&pp));
+		e->env_pgdir = page2pa(pp);
+	}
+	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
+	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
+
+	for (u_long va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
+		// printk("%16lx\n", va);
+		if (is_mapped_page(&cur_pgdir, va)) {
+			printk("duppage %16lx\n", va);
+			alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
+			u_long pa = get_pa(&e->env_pgdir, va);
+			u_long curpa = get_pa(&cur_pgdir, va);
+			memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
+		}
+	}
+
+	printk("nyan! %016lx\n", e->env_id);
+	printk("nyan! %016lx\n", e->env_tf.sepc);
+
 	e->env_status = ENV_NOT_RUNNABLE;
 	e->env_pri = curenv->env_pri;
 
@@ -281,7 +328,7 @@ int sys_exofork(void) {
  *   The invariant that 'env_sched_list' contains and only contains all runnable envs should be
  *   maintained.
  */
-int sys_set_env_status(u_int envid, u_int status) {
+int sys_set_env_status(u_long envid, u_long status) {
 	struct Env *env;
 
 	/* Step 1: Check if 'status' is valid. */
@@ -317,17 +364,24 @@ int sys_set_env_status(u_int envid, u_int status) {
  *  Returns -E_INVAL if the environment cannot be manipulated or 'tf' is invalid.
  *  Returns the original error if other underlying calls fail.
  */
-int sys_set_trapframe(u_int envid, struct Trapframe *tf) {
+int sys_set_trapframe(u_long envid, struct Trapframe *tf) {
+	printk("set trap\n");
+
 	if (is_illegal_va_range((u_long)tf, sizeof *tf)) {
 		return -E_INVAL;
 	}
+
+	u_long pa = get_pa(&cur_pgdir, (u_long)tf); // 需要翻译
+	tf = (struct Trapframe *)pa;
+	
 	struct Env *env;
 	try(envid2env(envid, &env, 1));
+	printk("equal %x\n", env);
 	if (env == curenv) {
 		*((struct Trapframe *)KSTACKTOP - 1) = *tf;
-		// return `tf->regs[2]` instead of 0, because return value overrides regs[2] on
+		// return `tf->regs[10]` instead of 0, because return value overrides regs[10] on
 		// current trapframe.
-		return tf->regs[2];
+		return tf->regs[10];
 	} else {
 		env->env_tf = *tf;
 		return 0;
@@ -352,7 +406,7 @@ void sys_panic(char *msg) {
  *   Return 0 on success.
  *   Return -E_INVAL: 'dstva' is neither 0 nor a legal address.
  */
-int sys_ipc_recv(u_int dstva) {
+int sys_ipc_recv(u_long dstva) {
 	/* Step 1: Check if 'dstva' is either zero or a legal address. */
 	if (dstva != 0 && is_illegal_va(dstva)) {
 		return -E_INVAL;
@@ -373,7 +427,7 @@ int sys_ipc_recv(u_int dstva) {
 	TAILQ_REMOVE(&env_sched_list, curenv, env_sched_link);
 
 	/* Step 5: Give up the CPU and block until a message is received. */
-	((struct Trapframe *)KSTACKTOP - 1)->regs[2] = 0;
+	((struct Trapframe *)KSTACKTOP - 1)->regs[10] = 0;
 	schedule(1);
 }
 
@@ -393,7 +447,7 @@ int sys_ipc_recv(u_int dstva) {
  *   'sys_ipc_recv'.
  *   Return the original error when underlying calls fail.
  */
-int sys_ipc_try_send(u_int envid, u_int value, u_int srcva, u_int perm) {
+int sys_ipc_try_send(u_long envid, u_long value, u_long srcva, u_long perm) {
 	struct Env *e;
 	struct Page *p;
 
@@ -432,11 +486,23 @@ int sys_ipc_try_send(u_int envid, u_int value, u_int srcva, u_int perm) {
 	/* Return -E_INVAL if 'srcva' is not zero and not mapped in 'curenv'. */
 	if (srcva != 0) {
 		/* Exercise 4.8: Your code here. (8/8) */	
-		if ((p = page_lookup(cur_pgdir, srcva, 0)) == NULL) {
+		// if ((p = page_lookup(cur_pgdir, srcva, 0)) == NULL) {
+		// 	return -E_INVAL;
+		// }
+		// page_insert(e->env_pgdir, e->env_asid, p, e->env_ipc_dstva, perm);
+
+		if (is_mapped_page(&cur_pgdir, srcva) == 0) {
 			return -E_INVAL;
 		}
-		page_insert(e->env_pgdir, e->env_asid, p, e->env_ipc_dstva, perm);
-		// printk("ipc: %08x: %08x->%08x: %08x(%08x)\n", e->env_id, e->env_ipc_dstva, curenv->env_id, srcva, pa);
+
+		u_long pa = get_pa(&cur_pgdir, srcva);
+
+		/* Step 5: Map the physical page at 'dstva' in the address space of 'dstid'. */
+		// return page_insert(dstenv->env_pgdir, dstenv->env_asid, pp, dstva, perm);
+		printk("ipc: %x: %016lx->%x: %016lx(%016lx)\n", e->env_id, e->env_ipc_dstva, curenv->env_id, srcva, pa);
+		int r = map_page_user(&e->env_pgdir, e->env_asid, e->env_ipc_dstva, pa, perm);
+		debug_page_va(&e->env_pgdir, e->env_ipc_dstva);
+		return r;
 
 	}
 	return 0;
@@ -476,7 +542,7 @@ int sys_cgetc(void) {
  *	|    rtc     | 0x15000000 | 0x200  | (dev_rtc.h)
  *	* ---------------------------------*
  */
-int sys_write_dev(u_int va, u_int pa, u_int len) {
+int sys_write_dev(u_long va, u_long pa, u_long len) {
 	/* Exercise 5.1: Your code here. (1/2) */
 
 	return 0;
@@ -493,7 +559,7 @@ int sys_write_dev(u_int va, u_int pa, u_int len) {
  *
  * Hint: You MUST use 'memcpy' to copy data after checking the validity.
  */
-int sys_read_dev(u_int va, u_int pa, u_int len) {
+int sys_read_dev(u_long va, u_long pa, u_long len) {
 	/* Exercise 5.1: Your code here. (2/2) */
 
 	return 0;
@@ -531,36 +597,46 @@ void *syscall_table[MAX_SYSNO] = {
  *   Number of arguments cannot exceed 5.
  */
 void do_syscall(struct Trapframe *tf) {
-	int (*func)(u_int, u_int, u_int, u_int, u_int);
-	int sysno = tf->regs[4];
+	int (*func)(u_long, u_long, u_long, u_long, u_long);
+	int sysno = tf->regs[10];
 	if (sysno < 0 || sysno >= MAX_SYSNO) {
-		tf->regs[2] = -E_NO_SYS;
+		tf->regs[10] = -E_NO_SYS;
 		return;
 	}
 
+	// printk("syscall sysno=%d\n", sysno);
+
 	/* Step 1: Add the EPC in 'tf' by a word (size of an instruction). */
 	/* Exercise 4.2: Your code here. (1/4) */
-	tf->cp0_epc += 4;
+	tf->sepc += 4;
 
 	/* Step 2: Use 'sysno' to get 'func' from 'syscall_table'. */
 	/* Exercise 4.2: Your code here. (2/4) */
 	func = syscall_table[sysno];
 
 	/* Step 3: First 3 args are stored in $a1, $a2, $a3. */
-	u_int arg1 = tf->regs[5];
-	u_int arg2 = tf->regs[6];
-	u_int arg3 = tf->regs[7];
+	// print_tf(tf);
+	u_long arg1 = tf->regs[11];
+	u_long arg2 = tf->regs[12];
+	u_long arg3 = tf->regs[13];
+	u_long arg4 = tf->regs[14];
+	u_long arg5 = tf->regs[15];
 
-	/* Step 4: Last 2 args are stored in stack at [$sp + 16 bytes], [$sp + 20 bytes]. */
-	u_int arg4, arg5;
-	/* Exercise 4.2: Your code here. (3/4) */
-	u_int sp = tf->regs[29];
-	arg4 = get(cur_pgdir, sp + 16);
-	arg5 = get(cur_pgdir, sp + 20);
+	u_long sip;
+	asm volatile("csrr %0, sip" : "=r"(sip));
+	// printk("sysno=%d\n", sysno);
+
+	// /* Step 4: Last 2 args are stored in stack at [$sp + 16 bytes], [$sp + 20 bytes]. */
+	// u_long arg4, arg5;
+	// /* Exercise 4.2: Your code here. (3/4) */
+	// u_long sp = tf->sscratch; // sp 改为 sscratch
+	// debug_page_user(&cur_pgdir);
+	// arg4 = get(&cur_pgdir, sp + 16);
+	// arg5 = get(&cur_pgdir, sp + 20);
 
 	/* Step 5: Invoke 'func' with retrieved arguments and store its return value to $v0 in 'tf'.
 	 */
 	/* Exercise 4.2: Your code here. (4/4) */
-	tf->regs[2] = func(arg1, arg2, arg3, arg4, arg5);
+	tf->regs[10] = func(arg1, arg2, arg3, arg4, arg5);
 
 }

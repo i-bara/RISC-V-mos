@@ -28,7 +28,7 @@ void srv(u_int pvt) {
 
 	int i;
 	u_int *buf = (u_int *)0x60000000;
-	syscall_mem_alloc(0, buf, PTE_D);
+	syscall_mem_alloc(0, buf, PTE_R | PTE_W | PTE_U);
 	for (i = 0; i < (tot >> 1); ++i) {
 		u_int who = 0;
 		u_int v = ipc_recv(&who, 0, 0);
@@ -43,7 +43,7 @@ void srv(u_int pvt) {
 	if (me == pvt) {
 		i = 0;
 		for (i = 0; i < (tot >> 1); ++i) {
-			ipc_send(buf[i << 1], buf[i << 1 | 1] + me, 0, 0);
+			ipc_send(buf[i << 1], buf[i << 1 | 1] + me, 0, PTE_R | PTE_U); // 页面标记
 		}
 		syscall_mem_unmap(0, buf);
 		while (1) {
@@ -57,11 +57,11 @@ void srv(u_int pvt) {
 				u_int dst = buf[i << 1];
 				u_int v = buf[i << 1 | 1];
 				uassert(v == who + dst);
-				ipc_send(dst, v - who + me + me, 0, 0);
+				ipc_send(dst, v - who + me + me, 0, PTE_R | PTE_U);
 			}
 		}
 	} else {
-		ipc_send(pvt, tot >> 1, buf, PTE_V);
+		ipc_send(pvt, tot >> 1, buf, PTE_V | PTE_R | PTE_U);
 	}
 }
 
@@ -73,7 +73,7 @@ void cli(u_int pvt, u_int *srvs) {
 	for (i = 0; i < (tot >> 1); ++i) {
 		u_int dst = srvs[i];
 		debugf("%x: sending %x to %x\n", me, dst + me, dst);
-		ipc_send(dst, me + dst, 0, 0);
+		ipc_send(dst, me + dst, 0, PTE_R | PTE_U);
 	}
 
 	if (me == pvt) {
@@ -91,7 +91,7 @@ void cli(u_int pvt, u_int *srvs) {
 	if (me == pvt) {
 		accepted();
 	} else {
-		ipc_send(pvt, me + me + pvt, 0, 0);
+		ipc_send(pvt, me + me + pvt, 0, PTE_R | PTE_U);
 	}
 }
 
@@ -105,7 +105,8 @@ int fork_n(int n) {
 }
 
 int main() {
-	syscall_mem_alloc(0, (void *)timer, PTE_D | PTE_LIBRARY);
+	timer = (u_int *)UTEMP;
+	syscall_mem_alloc(0, (void *)timer, PTE_R | PTE_W | PTE_U | PTE_LIBRARY);
 	*timer = 0;
 	if (fork_n(2)) {
 		sheep();
@@ -114,7 +115,7 @@ int main() {
 	u_int pvt = env->env_id;
 
 	volatile u_int *shm = (u_int *)0x1000000;
-	syscall_mem_alloc(0, (void *)shm, PTE_D | PTE_LIBRARY);
+	syscall_mem_alloc(0, (void *)shm, PTE_R | PTE_W | PTE_U | PTE_LIBRARY);
 
 	volatile u_int *srvs = shm + 1000;
 	int i;

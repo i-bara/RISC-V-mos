@@ -8,7 +8,7 @@
 /* These variables are set by mips_detect_memory() */
 u_long npage;	       /* Amount of memory(in pages) */
 
-Pde *cur_pgdir;
+u_long cur_pgdir;
 
 struct Page *pages;
 static u_long freemem;
@@ -32,14 +32,14 @@ void page_init() {
 
 	printk("Memory size: %lu KiB, number of pages: %lu\n", MEMORY_SIZE / 1024, npage);
 
-	pages = (struct Page *)alloc(npage * sizeof(struct Page), BY2PG, 1);
+	pages = (struct Page *)alloc(npage * sizeof(struct Page), PAGE_SIZE, 1);
 	
 	printk("to memory %lx for struct Pages.\n", freemem);
 	printk("pmap.c:\t mips vm init success\n");
 
 	LIST_INIT(&page_free_list);
 
-	freemem = ROUND(freemem, BY2PG);
+	freemem = ROUND(freemem, PAGE_SIZE);
 
 	int i;
 	for (i = 0; i < npage && i << VPN0_SHIFT < PADDR(freemem); i++) {
@@ -130,7 +130,7 @@ int page_alloc(struct Page **new) {
 	/* Step 2: Initialize this page with zero.
 	 * Hint: use `memset`. */
 	/* Exercise 2.4: Your code here. (2/2) */
-	memset((void *)page2kva(pp), 0, BY2PG);
+	memset((void *)page2kva(pp), 0, PAGE_SIZE);
 
 	*new = pp;
 	return 0;
@@ -373,7 +373,7 @@ void tlb_invalidate(u_int asid, u_long va) {
 // 	page_free(pp2);
 // 	struct Page_list test_free;
 // 	struct Page *test_pages;
-// 	test_pages = (struct Page *)alloc(10 * sizeof(struct Page), BY2PG, 1);
+// 	test_pages = (struct Page *)alloc(10 * sizeof(struct Page), PAGE_SIZE, 1);
 // 	LIST_INIT(&test_free);
 // 	// LIST_FIRST(&test_free) = &test_pages[0];
 // 	int i, j = 0;
@@ -396,7 +396,7 @@ void tlb_invalidate(u_int asid, u_long va) {
 // 	}
 // 	// insert_after test
 // 	int answer2[] = {0, 1, 2, 3, 4, 20, 5, 6, 7, 8, 9};
-// 	q = (struct Page *)alloc(sizeof(struct Page), BY2PG, 1);
+// 	q = (struct Page *)alloc(sizeof(struct Page), PAGE_SIZE, 1);
 // 	q->pp_ref = 20;
 
 // 	// printk("---%d\n",test_pages[4].pp_ref);
@@ -415,7 +415,7 @@ void tlb_invalidate(u_int asid, u_long va) {
 // }
 
 // void page_check(void) {
-// 	Pde *boot_pgdir = alloc(BY2PG, BY2PG, 1);
+// 	Pde *boot_pgdir = alloc(PAGE_SIZE, PAGE_SIZE, 1);
 // 	struct Page *pp, *pp0, *pp1, *pp2;
 // 	struct Page_list fl;
 
@@ -451,18 +451,18 @@ void tlb_invalidate(u_int asid, u_long va) {
 // 	assert(va2pa(boot_pgdir, 0x0) == page2pa(pp1));
 // 	assert(pp1->pp_ref == 1);
 
-// 	// should be able to map pp2 at BY2PG because pp0 is already allocated for page table
-// 	assert(page_insert(boot_pgdir, 0, pp2, BY2PG, 0) == 0);
-// 	assert(va2pa(boot_pgdir, BY2PG) == page2pa(pp2));
+// 	// should be able to map pp2 at PAGE_SIZE because pp0 is already allocated for page table
+// 	assert(page_insert(boot_pgdir, 0, pp2, PAGE_SIZE, 0) == 0);
+// 	assert(va2pa(boot_pgdir, PAGE_SIZE) == page2pa(pp2));
 // 	assert(pp2->pp_ref == 1);
 
 // 	// should be no free memory
 // 	assert(page_alloc(&pp) == -E_NO_MEM);
 
 // 	printk("start page_insert\n");
-// 	// should be able to map pp2 at BY2PG because it's already there
-// 	assert(page_insert(boot_pgdir, 0, pp2, BY2PG, 0) == 0);
-// 	assert(va2pa(boot_pgdir, BY2PG) == page2pa(pp2));
+// 	// should be able to map pp2 at PAGE_SIZE because it's already there
+// 	assert(page_insert(boot_pgdir, 0, pp2, PAGE_SIZE, 0) == 0);
+// 	assert(va2pa(boot_pgdir, PAGE_SIZE) == page2pa(pp2));
 // 	assert(pp2->pp_ref == 1);
 
 // 	// pp2 should NOT be on the free list
@@ -472,12 +472,12 @@ void tlb_invalidate(u_int asid, u_long va) {
 // 	// should not be able to map at PDMAP because need free page for page table
 // 	assert(page_insert(boot_pgdir, 0, pp0, PDMAP, 0) < 0);
 
-// 	// insert pp1 at BY2PG (replacing pp2)
-// 	assert(page_insert(boot_pgdir, 0, pp1, BY2PG, 0) == 0);
+// 	// insert pp1 at PAGE_SIZE (replacing pp2)
+// 	assert(page_insert(boot_pgdir, 0, pp1, PAGE_SIZE, 0) == 0);
 
-// 	// should have pp1 at both 0 and BY2PG, pp2 nowhere, ...
+// 	// should have pp1 at both 0 and PAGE_SIZE, pp2 nowhere, ...
 // 	assert(va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-// 	assert(va2pa(boot_pgdir, BY2PG) == page2pa(pp1));
+// 	assert(va2pa(boot_pgdir, PAGE_SIZE) == page2pa(pp1));
 // 	// ... and ref counts should reflect this
 // 	assert(pp1->pp_ref == 2);
 // 	printk("pp2->pp_ref %d\n", pp2->pp_ref);
@@ -487,17 +487,17 @@ void tlb_invalidate(u_int asid, u_long va) {
 // 	// pp2 should be returned by page_alloc
 // 	assert(page_alloc(&pp) == 0 && pp == pp2);
 
-// 	// unmapping pp1 at 0 should keep pp1 at BY2PG
+// 	// unmapping pp1 at 0 should keep pp1 at PAGE_SIZE
 // 	page_remove(boot_pgdir, 0, 0x0);
 // 	assert(va2pa(boot_pgdir, 0x0) == ~0);
-// 	assert(va2pa(boot_pgdir, BY2PG) == page2pa(pp1));
+// 	assert(va2pa(boot_pgdir, PAGE_SIZE) == page2pa(pp1));
 // 	assert(pp1->pp_ref == 1);
 // 	assert(pp2->pp_ref == 0);
 
-// 	// unmapping pp1 at BY2PG should free it
-// 	page_remove(boot_pgdir, 0, BY2PG);
+// 	// unmapping pp1 at PAGE_SIZE should free it
+// 	page_remove(boot_pgdir, 0, PAGE_SIZE);
 // 	assert(va2pa(boot_pgdir, 0x0) == ~0);
-// 	assert(va2pa(boot_pgdir, BY2PG) == ~0);
+// 	assert(va2pa(boot_pgdir, PAGE_SIZE) == ~0);
 // 	assert(pp1->pp_ref == 0);
 // 	assert(pp2->pp_ref == 0);
 
@@ -561,20 +561,30 @@ static void _debug_page(u_long va, u_long pte) {
 	} else {
 		printk(" ");
 	}
+	if (pte & PTE_RSW1) {
+		printk("C");
+	} else {
+		printk(" ");
+	}
+	if (pte & PTE_RSW2) {
+		printk("L");
+	} else {
+		printk(" ");
+	}
 	printk("|\n");
 }
 
 void debug_page(u_long *pgdir) {
-	printk("--------------------page---------------------\n");
-	for (u_long vpn2 = 0; vpn2 < BY2PG / sizeof(u_long); vpn2++) {
+	printk("---------------------page----------------------\n");
+	for (u_long vpn2 = 0; vpn2 < PAGE_SIZE / sizeof(u_long); vpn2++) {
 		u_long *pte2 = &((u_long *)*pgdir)[vpn2];
 
 		if (*pte2 & PTE_V) {
-			for (u_long vpn1 = 0; vpn1 < BY2PG / sizeof(u_long); vpn1++) {
+			for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
 				u_long *pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
 
 				if (*pte1 & PTE_V) {
-					for (u_long vpn0 = 0; vpn0 < BY2PG / sizeof(u_long); vpn0++) {
+					for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
 						u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 						if (*pte0 & PTE_V) {
@@ -587,7 +597,33 @@ void debug_page(u_long *pgdir) {
 			}
 		}
 	}
-	printk("---------------------------------------------\n");
+	printk("-----------------------------------------------\n");
+}
+
+void debug_page_user(u_long *pgdir) {
+	printk("---------------------page----------------------\n");
+	for (u_long vpn2 = 0; vpn2 < PAGE_SIZE / sizeof(u_long); vpn2++) {
+		u_long *pte2 = &((u_long *)*pgdir)[vpn2];
+
+		if (*pte2 & PTE_V) {
+			for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
+				u_long *pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+
+				if (*pte1 & PTE_V) {
+					for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
+						u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+						if ((*pte0 & PTE_V) && (*pte0 & PTE_U)) {
+							u_long va = vpn2 << VPN2_SHIFT | vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
+							_debug_page(va, *pte0);
+
+						}
+					}
+				}
+			}
+		}
+	}
+	printk("-----------------------------------------------\n");
 }
 
 void debug_page_va(u_long *pgdir, u_long va) {
@@ -607,38 +643,21 @@ void debug_page_va(u_long *pgdir, u_long va) {
 				_debug_page(va, *pte0);
 
 			} else {
-				printk("%08x invalid\n", va);
+				printk("%016lx invalid\n", va);
 			}
 		} else {
-			printk("%08x invalid\n", va);
+			printk("%016lx invalid\n", va);
 		}
 	} else {
-		printk("%08x invalid\n", va);
+		printk("%016lx invalid\n", va);
 	}
 }
 
-u_long get_pa(u_long *pgdir, u_long va) {
-	u_long *pte;
-	u_long pgdir2;
-	pte = &((u_long *)*pgdir)[VPN2(va)];
-	printk("kkk pte = %016lx\n", *pte);
-	if (*pte & PTE_V) {
-		pgdir2 = (u_long)PTE2PA(*pte);
-	}
-	pte = &((u_long *)pgdir2)[VPN1(va)];
-	printk("kkk pte = %016lx\n", *pte);
-	if (*pte & PTE_V) {
-		pgdir2 = (u_long)PTE2PA(*pte);
-	}
-	pte = &((u_long *)pgdir2)[VPN0(va)];
-	printk("kkk pte = %016lx\n", *pte);
-
+u_long debug_pte(u_long *pgdir, u_long va) {
 	u_long vpn0 = VPN0(va);
 	u_long vpn1 = VPN1(va);
 	u_long vpn2 = VPN2(va);
-	printk("%016lx\n", va);
-	printk("%016lx\n", (va >> 12));
-	printk("%016lx: %016lx: %016lx\n", vpn2, vpn1, vpn0);
+	printk("%3lx: %3lx: %3lx\n", vpn2, vpn1, vpn0);
 
 	u_long *pte2 = &((u_long *)*pgdir)[vpn2];
 	printk("pte2 = %016lx: %016lx\n", pte2, *pte2);
@@ -650,6 +669,52 @@ u_long get_pa(u_long *pgdir, u_long va) {
 		if (*pte1 & PTE_V) {
 			u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 			printk("pte0 = %016lx: %016lx\n", pte0, *pte0);
+
+			if (*pte0 & PTE_V) {
+				return *pte0;
+
+			} else {
+				printk("invalid\n");
+			}
+		} else {
+			printk("invalid\n");
+		}
+	} else {
+		printk("invalid\n");
+	}
+}
+
+u_long get_pa(u_long *pgdir, u_long va) {
+	// u_long *pte;
+	// u_long pgdir2;
+	// pte = &((u_long *)*pgdir)[VPN2(va)];
+	// printk("kkk pte = %016lx\n", *pte);
+	// if (*pte & PTE_V) {
+	// 	pgdir2 = (u_long)PTE2PA(*pte);
+	// }
+	// pte = &((u_long *)pgdir2)[VPN1(va)];
+	// printk("kkk pte = %016lx\n", *pte);
+	// if (*pte & PTE_V) {
+	// 	pgdir2 = (u_long)PTE2PA(*pte);
+	// }
+	// pte = &((u_long *)pgdir2)[VPN0(va)];
+	// printk("kkk pte = %016lx\n", *pte);
+
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+	u_long vpn2 = VPN2(va);
+	// printk("%016lx: %016lx: %016lx\n", vpn2, vpn1, vpn0);
+
+	u_long *pte2 = &((u_long *)*pgdir)[vpn2];
+	if (va==0x3ff000) printk("pte2 = %016lx: %016lx\n", pte2, *pte2);
+
+	if (*pte2 & PTE_V) {
+		u_long *pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+		if (va==0x3ff000) printk("pte1 = %016lx: %016lx\n", pte1, *pte1);
+
+		if (*pte1 & PTE_V) {
+			u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+			if (va==0x3ff000) printk("pte0 = %016lx: %016lx\n", pte0, *pte0);
 
 			if (*pte0 & PTE_V) {
 				return PTE2PA(*pte0) | va & PTE_OFFSET;
@@ -737,7 +802,10 @@ void set_perm(u_long *pgdir, u_long va, u_long perm) {
 }
 
 int alloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm) {
-	printk("alloc\n");
+	if (perm >= 0x400) {
+		panic("invalid perm");
+	}
+	
 	u_long vpn0 = VPN0(va);
 	u_long vpn1 = VPN1(va);
 	u_long vpn2 = VPN2(va);
@@ -803,9 +871,18 @@ map:
 	try(page_alloc(&pp));
 	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
 	pp->pp_ref++;
+
+	printk("alloc %x\n", va, curenv->env_id);
+	debug_page_va(pgdir, va);
+
+	return 0;
 }
 
 int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm");
+	}
+
 	if (pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) { 
 		return -E_INVAL;
 	}
@@ -880,9 +957,203 @@ map:
 	tlb_invalidate(asid, va);
 	*pte0 = PA2PTE(pa) | perm | PTE_V;
 	pa2page(pa)->pp_ref++;
+
+	return 0;
+}
+
+int alloc_page_user(u_long *pgdir, u_int asid, u_long va, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm");
+	}
+
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+	u_long vpn2 = VPN2(va);
+
+	u_long *pte2;
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte2 = &((u_long *)*pgdir)[vpn2];
+
+		if (*pte2 & PTE_V) {
+			pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+
+			if (*pte1 & PTE_V) {
+				pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+				if (*pte0 & PTE_V) {
+					u_long original_pa = PTE2PA(*pte0);
+					// clear
+					if (--pa2page(original_pa)->pp_ref == 0) {
+						page_free(pa2page(original_pa));
+					}
+					goto map;
+				} else {
+					goto map;
+				}
+			} else {
+				goto create_pte0;
+			}
+		} else {
+			goto create_pte1;
+		}
+	} else {
+		goto create_pte2;
+	}
+
+	struct Page *pp;
+
+create_pte2:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte2 = &((u_long *)*pgdir)[vpn2];
+
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18) + (va >> 27), (u_long)pte2, PTE_R | PTE_U);
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pte2 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (va >> 18), (u_long)pte1, PTE_R | PTE_U);
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+	// 建立自映射
+	printk(" self m %016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
+	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
+	get_pa(pgdir, va);
+	// debug_page(pgdir);
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> 9), get_pa(pgdir, PAGE_TABLE + (va >> 9)));
+
+map:
+	tlb_invalidate(asid, va);
+	try(page_alloc(&pp));
+	printk(" m %016lx->%016lx\n", va, perm);
+	
+	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
+	printk(" m %016lx->%016lx\n", va, *pte0);
+	pp->pp_ref++;
+
+	if (curenv) {
+		printk("alloc in env %x\n", curenv->env_id);
+	} else {
+		printk("alloc in kernel\n");
+	}
+	
+	debug_page_va(pgdir, va);
+
+	return 0;
+}
+
+int map_page_user(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm");
+	}
+
+	if (pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) { 
+		return -E_INVAL;
+	}
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+	u_long vpn2 = VPN2(va);
+
+	u_long *pte2;
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte2 = &((u_long *)*pgdir)[vpn2];
+
+		if (*pte2 & PTE_V) {
+			pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+
+			if (*pte1 & PTE_V) {
+				pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+				if (*pte0 & PTE_V) {
+					u_long original_pa = PTE2PA(*pte0);
+					if (original_pa == PTE2PA(PA2PTE(pa))) {
+						// add perm
+						tlb_invalidate(asid, va);
+						*pte0 = PA2PTE(pa) | perm | PTE_V;
+						return 0;
+					} else {
+						// clear
+						if (--pa2page(original_pa)->pp_ref == 0) {
+							page_free(pa2page(original_pa));
+						}
+						goto map;
+					}
+				} else {
+					goto map;
+				}
+			} else {
+				goto create_pte0;
+			}
+		} else {
+			goto create_pte1;
+		}
+	} else {
+		goto create_pte2;
+	}
+
+	struct Page *pp;
+
+create_pte2:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte2 = &((u_long *)*pgdir)[vpn2];
+
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18) + (va >> 27), (u_long)pte2, PTE_R | PTE_U);
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pte2 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
+
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (va >> 18), (u_long)pte1, PTE_R | PTE_U);
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+	// 建立自映射
+	// printk("%016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
+	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
+	// debug_page(pgdir);
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> 9), get_pa(pgdir, PAGE_TABLE + (va >> 9)));
+
+map:
+	tlb_invalidate(asid, va);
+	*pte0 = PA2PTE(pa) | perm | PTE_V;
+	pa2page(pa)->pp_ref++;
+
+	return 0;
 }
 
 int unmap_page(Pde *pgdir, u_int asid, u_long va) {
+	if (va >= KERNBASE && va < KERNBASE + MEMORY_SIZE) {
+		panic("nyan");
+	}
 	u_long vpn0 = VPN0(va);
 	u_long vpn1 = VPN1(va);
 	u_long vpn2 = VPN2(va);
@@ -978,20 +1249,24 @@ int alloc_pgdir(u_long *pgdir) {
 
 int destroy_pgdir(u_long *pgdir, u_int asid) {
 	if (*pgdir) {
-		for (u_long vpn2 = 0; vpn2 < BY2PG / sizeof(u_long); vpn2++) {
+		for (u_long vpn2 = 0; vpn2 < PAGE_SIZE / sizeof(u_long); vpn2++) {
 			u_long *pte2 = &((u_long *)*pgdir)[vpn2];
+			if (vpn2 == 2 || vpn2 == PENVS) {
+				continue; // 两种映射形式！巨页映射应该巨页销毁！
+			} 
 
 			if (*pte2 & PTE_V) {
-				for (u_long vpn1 = 0; vpn1 < BY2PG / sizeof(u_long); vpn1++) {
+				for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
 					u_long *pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
 
 					if (*pte1 & PTE_V) {
-						for (u_long vpn0 = 0; vpn0 < BY2PG / sizeof(u_long); vpn0++) {
+						for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
 							u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 							if (*pte0 & PTE_V) {
 								u_long va = vpn2 << VPN2_SHIFT | vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
 								u_long pa = PTE2PA(*pte0);
+								u_long perm = *pte0 & PTE_PERM;
 
 								// clear
 								if (--pa2page(pa)->pp_ref == 0) {
@@ -1051,9 +1326,7 @@ int destroy_pgdir(u_long *pgdir, u_int asid) {
 // 	*(u_long *)kva = value;
 // }
 
-// u_long get(Pde *pgdir, u_long va) {
-// 	u_long pa = get_pa(pgdir, va);
-// 	pa = pa | va & 0x00000fff;
-// 	u_long kva = KADDR(pa);
-// 	return *(u_long *)kva;
-// }
+u_long get(u_long *pgdir, u_long va) {
+	u_long pa = get_pa(pgdir, va);
+	return *(u_long *)pa;
+}

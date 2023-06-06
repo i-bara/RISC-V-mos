@@ -24,7 +24,7 @@ int main() {
 	if ((who = fork()) != 0) {
 		// get the ball rolling
 		debugf("@@@@@send 0 from %x to %x\n", syscall_getenvid(), who);
-		ipc_send(who, 0, 0, 0);
+		ipc_send(who, 0, 0, PTE_R | PTE_U);
 		// user_panic("&&&&&&&&&&&&&&&&&&&&&&&&m");
 	} else {
 		isSon = 1;
@@ -43,7 +43,7 @@ int main() {
 
 		i++;
 		debugf("@@@@@send %d from %x to %x\n", i, syscall_getenvid(), who);
-		ipc_send(who, i, 0, 0);
+		ipc_send(who, i, 0, PTE_R | PTE_U);
 
 		if (i == 10) {
 			break;
@@ -72,7 +72,9 @@ int main() {
 			ptr[200] = i;
 			ptr[300] = 4;
 			debugf("@@@@grandson %x send Page to son %x\n", syscall_getenvid(), i);
-			ipc_send(i, 0, ptr, PTE_D | PTE_LIBRARY);
+			debug_page_user();
+			debugf("send: %x(%016lx)\n", env->env_id, ptr);
+			ipc_send(i, 0, ptr, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 注意样例的页面标记也需要修改
 
 			debugf("@@@@grandson %x is waiting ack from son %x\n", syscall_getenvid(),
 			       i);
@@ -87,7 +89,7 @@ int main() {
 			debugf("@@@@2 send is %x recv is %x\n", ptr[100], ptr[200]);
 			debugf("@@@@grandson %x send continue to son %x\n", syscall_getenvid(),
 			       who);
-			ipc_send(who, 0, 0, 0);
+			ipc_send(who, 0, 0, PTE_R | PTE_U);
 
 			debugf("@@@@grandson %x wait for father signal\n", syscall_getenvid());
 			i = ipc_recv(&who, 0, 0);
@@ -100,7 +102,7 @@ int main() {
 		} else {
 			// Son
 			debugf("@@@@son tell grandson his envid %x\n", syscall_getenvid());
-			ipc_send(who, syscall_getenvid(), 0, 0);
+			ipc_send(who, syscall_getenvid(), 0, PTE_R | PTE_U);
 
 			debugf("@@@@son %x is waiting from grandSon %x page\n", syscall_getenvid(),
 			       who);
@@ -112,13 +114,15 @@ int main() {
 			}
 			debugf("@@@@1 %d lab %d strong testcase1\n", ptr[0], ptr[300]);
 			debugf("@@@@1 send is %x recv is %x\n", ptr[100], ptr[200]);
+			debugf("recv: %x(%016lx)\n", env->env_id, ptr);
+			debug_page_user();
 
 			ptr[0] = 4;
 			ptr[100] = syscall_getenvid();
 			ptr[200] = who;
 			ptr[300] = 2020;
 			debugf("@@@@son %x send ack to grandson %x\n", syscall_getenvid(), who);
-			ipc_send(who, 0, 0, 0);
+			ipc_send(who, 0, 0, PTE_R | PTE_U);
 			debugf("@@@@son %x wait continue from grandson %x\n", syscall_getenvid(),
 			       who);
 			i = ipc_recv(&who, 0, 0);
@@ -129,7 +133,7 @@ int main() {
 			debugf("@@@@son %x send Page to father %x\n", syscall_getenvid(), father);
 			ipc_send(father, 0, ptr, perm);
 			debugf("@@@@son %x tell father grandson id %x\n", syscall_getenvid(), who);
-			ipc_send(father, who, 0, 0);
+			ipc_send(father, who, 0, PTE_R | PTE_U);
 			debugf("@@@@son %x wait for father %x signal\n", syscall_getenvid(),
 			       father);
 			i = ipc_recv(&who, 0, 0);
@@ -163,9 +167,9 @@ int main() {
 		// earlier to avoid sched racing. To enhance the case, we may modify ptr[300] after
 		// the son sends an ack.
 		debugf("@@@@father send signal to son\n");
-		ipc_send(who, 0, 0, 0);
+		ipc_send(who, 0, 0, PTE_R | PTE_U);
 		debugf("@@@@father send signal to grandson\n");
-		ipc_send(i, 0, 0, 0);
+		ipc_send(i, 0, 0, PTE_R | PTE_U);
 	}
 	debugf("@@@@I am killing %x\n", syscall_getenvid());
 

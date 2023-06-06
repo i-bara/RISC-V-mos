@@ -4,6 +4,8 @@
 const int PPC = 0x1001;
 
 int main() {
+	// syscall_ipc_recv(0x40000000);
+	debugf("Hello world!\n");
 	int me, r;
 	me = syscall_getenvid();
 	debugf("i am %x\n", me);

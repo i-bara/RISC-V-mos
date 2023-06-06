@@ -26,14 +26,14 @@ struct Env {
 	TAILQ_ENTRY(Env) env_sched_link;
 	u_int env_pri;
 	// Lab 4 IPC
-	u_int env_ipc_value;   // data value sent to us
+	u_long env_ipc_value;   // data value sent to us 改为了 64 位
 	u_int env_ipc_from;    // envid of the sender
 	u_int env_ipc_recving; // env is blocked receiving
-	u_int env_ipc_dstva;   // va at which to map received page
+	u_long env_ipc_dstva;   // va at which to map received page 改为了 64 位
 	u_int env_ipc_perm;    // perm of page mapping received
 
 	// Lab 4 fault handling
-	u_int env_user_tlb_mod_entry; // user tlb mod handler
+	u_long env_user_tlb_mod_entry; // user tlb mod handler 改为了 64 位
 
 	// Lab 6 scheduler counts
 	u_int env_runs; // number of times been env_run'ed

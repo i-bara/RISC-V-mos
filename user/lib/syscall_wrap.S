@@ -1,10 +1,14 @@
 #include <asm/asm.h>
 
-LEAF(msyscall)
+.globl msyscall;
+	.align 2;
+	.type msyscall, @function;
+	msyscall:           
 	// Just use 'syscall' instruction and return.
 
 	/* Exercise 4.1: Your code here. */
-	syscall
+	ecall
 	jr		ra
 
-END(msyscall)
+.end function;
+.size function, .- function

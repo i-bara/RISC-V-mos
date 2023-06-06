@@ -59,17 +59,86 @@ void yay() {
 }
 
 void handle_exception(u_long err) {
-	u_long r;
-    asm volatile("csrr %0, scause " : "=r"(r));
-    printk("Exception: cause=%ld\n", r);
-    asm volatile("csrr %0, sepc " : "=r"(r));
-    printk("epc=%016lx\n", r);
-    asm volatile("csrr %0, sstatus " : "=r"(r));
-    printk("status=%016lx\n", r);
-    asm volatile("csrr %0, stval " : "=r"(r));
-    printk("tval=%016lx\n", r);
-    halt();
-    asm volatile("sret");
+	struct Trapframe *tf = (struct Trapframe *)KSTACKTOP - 1;
+	// print_tf(tf);
+
+	u_long cause, epc, status, tval;
+
+    asm volatile("csrr %0, scause " : "=r"(cause));
+    asm volatile("csrr %0, sepc " : "=r"(epc));
+    asm volatile("csrr %0, sstatus " : "=r"(status));
+    asm volatile("csrr %0, stval " : "=r"(tval));
+
+	// printk("Exception: cause=%ld\n", cause);
+
+	if (cause == 8) {
+		do_syscall(tf);
+		// print_tf(tf);
+		asm volatile("add sp, %0, zero" : : "r"(tf));
+		asm volatile("j ret_from_exception");
+	} else if (cause == 12 || cause == 13 || cause == 15) {
+		if (tval < 0x3000 || tval >= 0x200000000L) {
+			panic("virtual memory out of range");
+		}
+
+		print_tf(tf);
+		if (is_mapped_page(&cur_pgdir, tval)) {
+			u_long pa = get_pa(&cur_pgdir, tval);
+			u_long perm = get_perm(&cur_pgdir, tval);
+
+			debug_page_va(&cur_pgdir, tval);
+
+			if (cause == 12) {
+				map_page(&cur_pgdir, curenv->env_asid, tval, pa, perm | PTE_X);
+				asm volatile("add sp, %0, zero" : : "r"(tf));
+				asm volatile("j ret_from_exception");
+			}
+
+			// printk("cow=%d\n", (get_perm(&cur_pgdir, tval) & PTE_COW) != 0);
+			// printk("entry=%016lx of %x\n", curenv->env_user_tlb_mod_entry, curenv->env_id);
+
+			if (get_perm(&cur_pgdir, tval) & PTE_COW) {
+				
+				if (!is_mapped_page(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long))) {
+					printk("alloc uxstacktop!\n");
+					alloc_page_user(&cur_pgdir, curenv->env_asid, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long), PTE_R | PTE_W | PTE_U);
+				}
+
+				u_long pa = get_pa(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long));
+				printk("pa=%016lx\n", pa);
+				*(struct Trapframe *)(pa + sizeof(u_long)) = *tf;
+				*(u_long *)pa = (u_long)tf;
+				
+				tf->sepc = curenv->env_user_tlb_mod_entry;
+				tf->sscratch = UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long);
+				tf->regs[10] = UXSTACKTOP - sizeof(struct Trapframe);
+				
+				asm volatile("add sp, %0, zero" : : "r"(tf));
+				asm volatile("j ret_from_exception");
+			} else if (cause == 15) {
+				map_page(&cur_pgdir, curenv->env_asid, tval, pa, perm | PTE_W);
+				asm volatile("add sp, %0, zero" : : "r"(tf));
+				asm volatile("j ret_from_exception");
+			}
+		}
+
+		printk("cause=%d\n", cause);
+		debug_page_va(&cur_pgdir, tval);
+		printk("page fault in %016lx        env=%x at pc=%016lx\n", tval, curenv->env_id, epc);
+		alloc_page_user(&cur_pgdir, curenv->env_asid, tval, PTE_R | PTE_W | PTE_U);
+		// printk("%016lx\n", tf);
+		// debug_page_user(&cur_pgdir);
+		
+		asm volatile("add sp, %0, zero" : : "r"(tf));
+		asm volatile("j ret_from_exception");
+	} else {
+		printk("Exception: cause=%ld\n", cause);
+		printk("epc=%016lx\n", epc);
+		printk("status=%016lx\n", status);
+		printk("tval=%016lx\n", tval);
+		halt();
+	}
+    
 }
 
 void print_reg_zero(u_long reg) {

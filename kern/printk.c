@@ -17,15 +17,15 @@ void printk(const char *fmt, ...) {
 }
 
 void print_tf(struct Trapframe *tf) {
-	printk("------trapframe at %08x------\n"
-		   "zero:%08x  at:  %08x  v0:  %08x  v1:  %08x\n"
-	       "a0:  %08x  a1:  %08x  a2:  %08x  a3:  %08x\n"
-	       "t0:  %08x  t1:  %08x  t2   %08x  t3:  %08x\n"
-		   "t4:  %08x  t5:  %08x  t6   %08x  t7:  %08x\n"
-	       "s0:  %08x  s1:  %08x  s2:  %08x  s3:  %08x\n"
-		   "s4:  %08x  s5:  %08x  s6:  %08x  s7:  %08x\n"
-		   "s8:  %08x  s9:  %08x  k0:  %08x  k1:  %08x\n"
-		   "gp:  %08x  sp:  %08x  fp:  %08x  ra:  %08x\n", 
+	printk("------trapframe at %016lx------\n"
+		   "zero:%016lx  at:  %016lx  v0:  %016lx  v1:  %016lx\n"
+	       "a0:  %016lx  a1:  %016lx  a2:  %016lx  a3:  %016lx\n"
+	       "t0:  %016lx  t1:  %016lx  t2   %016lx  t3:  %016lx\n"
+		   "t4:  %016lx  t5:  %016lx  t6   %016lx  t7:  %016lx\n"
+	       "s0:  %016lx  s1:  %016lx  s2:  %016lx  s3:  %016lx\n"
+		   "s4:  %016lx  s5:  %016lx  s6:  %016lx  s7:  %016lx\n"
+		   "s8:  %016lx  s9:  %016lx  k0:  %016lx  k1:  %016lx\n"
+		   "gp:  %016lx  sp:  %016lx  fp:  %016lx  ra:  %016lx\n", 
 		   tf, 
 		   tf->regs[0], tf->regs[1], tf->regs[2], tf->regs[3], 
 		   tf->regs[4], tf->regs[5], tf->regs[6], tf->regs[7], 
@@ -35,6 +35,6 @@ void print_tf(struct Trapframe *tf) {
 		   tf->regs[20], tf->regs[21], tf->regs[22], tf->regs[23], 
 		   tf->regs[24], tf->regs[25], tf->regs[26], tf->regs[27], 
 		   tf->regs[28], tf->regs[29], tf->regs[30], tf->regs[31]);
-	printk("sie: %016x    sepc:  %016x    scause: %016x    sstatus:  %016x\n", tf->sie, tf->sepc, tf->scause, tf->sstatus);
-	printk("sip: %016x    stvec: %016x    stval:  %016x    sscratch: %016x\n", tf->sip, tf->stvec, tf->stval, tf->sscratch);
+	printk("sie: %016lx    sepc:  %016lx    scause: %016lx    sstatus:  %016lx\n", tf->sie, tf->sepc, tf->scause, tf->sstatus);
+	printk("sip: %016lx    stvec: %016lx    stval:  %016lx    sscratch: %016lx\n", tf->sip, tf->stvec, tf->stval, tf->sscratch);
 }

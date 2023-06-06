@@ -8,10 +8,12 @@
 #include <syscall.h>
 #include <trap.h>
 
-#define vpt ((volatile Pte *)UVPT)
-#define vpd ((volatile Pde *)(UVPT + (PDX(UVPT) << PGSHIFT)))
-#define envs ((volatile struct Env *)UENVS)
-#define pages ((volatile struct Page *)UPAGES)
+#define pt2 ((volatile long *)(PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18)))
+#define pt1 ((volatile long *)(PAGE_TABLE + (PAGE_TABLE >> 9)))
+#define pt0 ((volatile long *)(PAGE_TABLE))
+// #define vpd ((volatile Pde *)(UVPT + (PDX(UVPT) << PGSHIFT)))
+#define envs ((volatile struct Env *)ENVS)
+#define pages ((volatile struct Page *)PAGES)
 
 // libos
 void exit(void) __attribute__((noreturn));

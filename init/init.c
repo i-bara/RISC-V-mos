@@ -12,6 +12,9 @@
 #include <generated/init_override.h>
 #else
 
+#define MOS_SCHED_MAX_TICKS 100
+#define MOS_SCHED_END_PC 0x500000
+
 void mips_init() {
 	printk("\n\ninit.c:\tmips_init() is called\n");
 
@@ -59,7 +62,7 @@ void mips_init() {
 	printk("%016lx\n", sie);
 
 	
-	int r = sbi_set_timer(10000000);
+	int r = sbi_set_timer(50000000L);
 	asm volatile("csrs sie, %0" : : "r"(SIE_STIE));
 	asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
 

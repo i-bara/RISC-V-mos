@@ -19,6 +19,7 @@
 #define PTE_RSW2 0x0000000000000200L
 
 // Uncacheable bit. 0 to make the access cacheable, 1 for uncacheable.
+#define PTE_PERM 0x00000000000003ffL
 #define PTE_PPN0 0x000000000007fc00L
 #define PTE_PPN1 0x000000000ff80000L
 #define PTE_PPN2 0x003ffffff0000000L
@@ -57,6 +58,8 @@
 #define PTE_LIBRARY PTE_RSW2
 
 // #define PDMAP (1 << PDSHIFT)
+#define PAGE_SIZE (1 << VPN0_SHIFT)
+
 #define BY2PG  (1 << PPN0_SHIFT)
 #define BY2PG1 (1 << PPN1_SHIFT)
 #define BY2PG2 (1 << PPN2_SHIFT)

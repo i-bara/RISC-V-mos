@@ -12,6 +12,8 @@
 // 	li      sp, KSTACKTOP
 // .set noreorder
 // 1:
+	csrrw	sp, sscratch, sp
+	li		sp, KSTACKTOP
 	sd		ra, TF_REG1 - TF_SIZE(sp)
 	sd      sp, TF_REG2 - TF_SIZE(sp)
 	addi    sp, sp, -TF_SIZE

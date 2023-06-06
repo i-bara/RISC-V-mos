@@ -10,7 +10,7 @@
 // Our bitmap requires this to be a multiple of 32.
 #define NASID 64
 
-struct Env envs[NENV] __attribute__((aligned(BY2PG))); // All environments
+struct Env envs[NENV] __attribute__((aligned(PAGE_SIZE))); // All environments
 
 struct Env *curenv = NULL;	      // the current env
 static struct Env_list env_free_list; // Free list
@@ -18,7 +18,10 @@ static struct Env_list env_free_list; // Free list
 // Invariant: 'env' in 'env_sched_list' iff. 'env->env_status' is 'RUNNABLE'.
 struct Env_sched_list env_sched_list; // Runnable list
 
-static u_long base_pgdir;
+u_long base_pgdir;
+
+static u_long delta_time = 10000000L;
+static u_long time = 20000000L;
 
 static uint32_t asid_bitmap[NASID / 32] = {0}; // 64
 
@@ -127,16 +130,16 @@ int envid2env(u_int envid, struct Env **penv, int checkperm) {
  *   permission bits 'perm | PTE_V' for the entries.
  *
  * Pre-Condition:
- *   'pa', 'va' and 'size' are aligned to 'BY2PG'.
+ *   'pa', 'va' and 'size' are aligned to 'PAGE_SIZE'.
  */
 static void map_pages(u_long *pgdir, u_int asid, u_long pa, u_long va, u_long size, u_int perm) {
 
-	assert(pa % BY2PG == 0);
-	assert(va % BY2PG == 0);
-	assert(size % BY2PG == 0);
+	assert(pa % PAGE_SIZE == 0);
+	assert(va % PAGE_SIZE == 0);
+	assert(size % PAGE_SIZE == 0);
 
 	/* Step 1: Map virtual address space to physical address space. */
-	for (u_long i = 0; i < size; i += BY2PG) {
+	for (u_long i = 0; i < size; i += PAGE_SIZE) {
 		/*
 		 * Hint:
 		 *  Map the virtual page 'va + i' to the physical page 'pa + i' using 'page_insert'.
@@ -189,10 +192,10 @@ void env_init(void) {
 	p->pp_ref++;
 
 	base_pgdir = 0;
-	map_pages(&base_pgdir, 0, pages, PAGES, ROUND(npage * sizeof(struct Page), BY2PG),
-		    PTE_G);
-	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), BY2PG),
-		    PTE_G);
+	map_pages(&base_pgdir, 0, pages, PAGES, ROUND(npage * sizeof(struct Page), PAGE_SIZE),
+		    PTE_R | PTE_G | PTE_U);
+	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), PAGE_SIZE),
+		    PTE_R | PTE_G | PTE_U);
 	map_pages(&base_pgdir, 0, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X);
 	// printk("base is %016lx\n", base_pgdir);
 
@@ -273,8 +276,9 @@ static int env_setup_vm(struct Env *e) {
 	// printk("pgdir is %016lx\n", e->env_pgdir);
 	// printk("%016lx\n", (u_long *)e->env_pgdir);
 
-	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
-	((u_long *)e->env_pgdir)[PPT] = PA2PTE(e->env_pgdir) | PTE_V;
+	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V; // 这样不可以，因为标记不一样
+
+	// ((u_long *)e->env_pgdir)[PPT] = PA2PTE(e->env_pgdir) | PTE_V; 不可以这样自映射
 	
 	// ((u_long *)e->env_pgdir)[PENV] = e->env_pgdir | PTE_V;
 	// printk("pgdir is %016lx\n", e->env_pgdir);
@@ -342,7 +346,7 @@ int env_alloc(struct Env **new, u_int parent_id) {
 	e->env_tf.sie = SIE_UTIE;
 	e->env_tf.sstatus = SSTATUS_UIE;
 	// Keep space for 'argc' and 'argv'.
-	e->env_tf.regs[29] = USTACKTOP - sizeof(int) - sizeof(char **);
+	e->env_tf.sscratch = USTACKTOP - sizeof(int) - sizeof(char **); // 改成了 sscratch // 栈指针是 2 而不是 29，忘了改......
 
 	/* Step 5: Remove the new Env from env_free_list. */
 	/* Exercise 3.4: Your code here. (4/4) */
@@ -357,7 +361,7 @@ int env_alloc(struct Env **new, u_int parent_id) {
  *   If 'src' is not NULL, copy the 'len' bytes from 'src' into 'offset' at this page.
  *
  * Pre-Condition:
- *   'offset + len' is not larger than 'BY2PG'.
+ *   'offset + len' is not larger than 'PAGE_SIZE'.
  *
  * Hint:
  *   The address of env structure is passed through 'data' from 'elf_load_seg', where this function
@@ -384,10 +388,24 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
 	// }
 
 	/* Step 3: Insert 'p' into 'env->env_pgdir' at 'va' with 'perm'. */
-	try(alloc_page(&env->env_pgdir, env->env_asid, va, perm));
+	// printk("%016lx\n", va);
+	if (is_mapped_page(&env->env_pgdir, va) == 0) {
+		try(alloc_page_user(&env->env_pgdir, env->env_asid, va, perm));
+	}
+	
+	// printk("%016lx\n", env->env_pgdir);
+	// debug_page(&env->env_pgdir);
 	u_long pa = get_pa(&env->env_pgdir, va);
 	if (src != NULL) {
+		// 测试代码是否导入成功
+		printk("from %016lx to %016lx->%016lx(%d)\n", src, (void *)(va + offset), (void *)(pa + offset), len);
 		memcpy((void *)(pa + offset), src, len);
+		printk("%016lx\n", *(u_long *)pa);
+		printk("%016lx\n", ((u_long *)pa)[1]);
+		printk("%016lx\n", ((u_long *)pa)[2]);
+		printk("%016lx\n", ((u_long *)pa)[3]);
+		printk("%016lx\n", ((u_long *)pa)[4]);
+		printk("%016lx\n", ((u_long *)pa)[5]);
 	}
 	return 0;
 	// return page_insert(env->env_pgdir, env->env_asid, p, va, perm);
@@ -400,7 +418,7 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
  */
 static void load_icode(struct Env *e, const void *binary, size_t size) {
 	/* Step 1: Use 'elf_from' to parse an ELF header from 'binary'. */
-	const Elf32_Ehdr *ehdr = elf_from(binary, size);
+	const Elf64_Ehdr *ehdr = elf_from_64(binary, size);
 	if (!ehdr) {
 		panic("bad elf at %x", binary);
 	}
@@ -408,16 +426,21 @@ static void load_icode(struct Env *e, const void *binary, size_t size) {
 	/* Step 2: Load the segments using 'ELF_FOREACH_PHDR_OFF' and 'elf_load_seg'.
 	 * As a loader, we just care about loadable segments, so parse only program headers here.
 	 */
+	printk("size=%d\n", size);
+	printk("binary=%016lx\n", binary);
+
 	size_t ph_off;
 	ELF_FOREACH_PHDR_OFF (ph_off, ehdr) {
-		Elf32_Phdr *ph = (Elf32_Phdr *)(binary + ph_off);
+		printk("elf!\n");
+		Elf64_Phdr *ph = (Elf32_Phdr *)(binary + ph_off);
 		if (ph->p_type == PT_LOAD) {
 			// 'elf_load_seg' is defined in lib/elfloader.c
 			// 'load_icode_mapper' defines the way in which a page in this segment
 			// should be mapped.
-			panic_on(elf_load_seg(ph, binary + ph->p_offset, load_icode_mapper, e));
+			panic_on(elf_load_seg_64(ph, binary + ph->p_offset, load_icode_mapper, e));
 		}
 	}
+	
 
 	/* Step 3: Set 'e->env_tf.cp0_epc' to 'ehdr->e_entry'. */
 	/* Exercise 3.6: Your code here. */
@@ -449,13 +472,18 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
 	 * 'env_sched_list' using 'TAILQ_INSERT_HEAD'. */
 	/* Exercise 3.7: Your code here. (3/3) */
 	load_icode(e, binary, size);
+
+	printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000));
 	
-	struct Page *pp;
-	try(page_alloc(&pp));
-	e->env_pgdir = page2pa(pp);
+	// struct Page *pp;
+	// try(page_alloc(&pp));
+	// e->env_pgdir = page2pa(pp); // 这个不应该写，因为 load_icode 的时候就分配了页目录
+
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
 	// map_pages(&e->env_pgdir, e->env_asid, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X); // map 物理地址，稍后可以优化
 	TAILQ_INSERT_HEAD(&env_sched_list, e, env_sched_link);
+
+	printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000));
 
 	return e;
 }
@@ -470,8 +498,17 @@ void env_free(struct Env *e) {
 	/* Hint: Note the environment's demise.*/
 	printk("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
+
+	// debug_pte(&cur_pgdir, 0x80200000L);
+	// u_long pa1 = get_pa(&cur_pgdir, 0x80200000L);
+	// struct Page *pp = pa2page(pa1);
+	// printk("pp->pp_ref=%d\n", pp->pp_ref);
+
+	asm volatile("csrw satp, %0" : : "r"(SATP_MODE_BARE & SATP_MODE)); // 必须先切换为裸机再摧毁页表！！
+	asm volatile("sfence.vma x0, %0" : : "r"(e->env_asid));
 	destroy_pgdir(&e->env_pgdir, e->env_asid);
 	asid_free(e->env_asid);
+
 	/* Hint: Flush all mapped pages in the user portion of the address space */
 	// for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
 	// 	/* Hint: only look at mapped page tables. */
@@ -504,6 +541,8 @@ void env_free(struct Env *e) {
 	e->env_status = ENV_FREE;
 	LIST_INSERT_HEAD((&env_free_list), (e), env_link);
 	TAILQ_REMOVE(&env_sched_list, (e), env_sched_link);
+
+	e = TAILQ_FIRST(&env_sched_list);
 }
 
 /* Overview:
@@ -520,9 +559,6 @@ void env_destroy(struct Env *e) {
 		schedule(1);
 	}
 }
-
-#define MOS_SCHED_MAX_TICKS 100
-#define MOS_SCHED_END_PC 0x500000
 
 /* Overview:
  *   This function is depended by our judge framework. Please do not modify it.
@@ -605,7 +641,7 @@ void env_run(struct Env *e) {
 	// lab 2: tlb
 
 
-	// print_tf(&e->env_tf);
+	
 	asm volatile("csrw sepc, %0" : : "r"(e->env_tf.sepc));
 	u_long status;
 	asm volatile("csrr %0, sstatus" : "=r"(status));
@@ -613,14 +649,85 @@ void env_run(struct Env *e) {
 	asm volatile("csrw sstatus, %0" : : "r"(status & 0xfffffffffffffeff));
 	// asm volatile("csrr %0, sstatus" : "=r"(status));
 	// printk("sstatus = %016lx\n", status);
-
 	
+	// debug_page(&e->env_pgdir);
+	// printk("%x\n", e->env_id);
+	// printk("%016lx\n", envs[1].env_pgdir);
 
-	asm volatile("csrw satp, %0" : : "r"(SATP_MODE_SV39 & SATP_MODE | (e->env_asid << 44) & SATP_ASID | (e->env_pgdir >> 12) & SATP_PPN));
+	// debug_pte(&cur_pgdir, 0x80200000L);
 
-	int r = sbi_set_timer(10000000);
-	asm volatile("csrs sie, %0" : : "r"(SIE_STIE));
-	asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
+	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！不知道为什么摧毁摧毁后切换的下一个进程没有内核映射
+
+	asm volatile("csrw satp, %0" : : "r"(SATP_MODE_SV39 & SATP_MODE | ((u_long)e->env_asid << 44) & SATP_ASID | (e->env_pgdir >> 12) & SATP_PPN));
+	asm volatile("sfence.vma x0, x0");
+	
+	// 一种简单的自映射方法，但是在 RISC-V 下不可以这样，因为这样无法访问页表，因为缺少 PTE_R
+	// ((u_long *)e->env_pgdir)[3] = PA2PTE(e->env_pgdir) | PTE_V;
+
+	// debug_page_user(&e->env_pgdir);
+	// printk("%016lx\n", e->env_pgdir);
+
+
+	((u_long *)e->env_pgdir)[4] = ((u_long *)base_pgdir)[4] | PTE_V; // 映射 pages 和 envs
+	// debug_page(&e->env_pgdir);
+
+	// printk("%016lx\n", ((struct Env *)ENVS)[0].env_id);
+	
+	
+	// 检查自映射，如果这两个相等就说明自映射成功（这个检查首先需要把 PTE_U 位去掉）
+	// debug_page_user(&e->env_pgdir);
+	// printk("%016lx\n", get_pa(&e->env_pgdir, 0x400360));
+	// u_long pa = get_pa(&e->env_pgdir, 0x400360);
+	// printk("%016lx\n", *(u_long *)pa);
+	// printk("%016lx\n", ((u_long *)pa)[1]);
+	// printk("%016lx\n", ((u_long *)pa)[2]);
+	// printk("%016lx\n", ((u_long *)pa)[3]);
+	// printk("%016lx\n", ((u_long *)pa)[4]);
+	// printk("%016lx\n", ((u_long *)pa)[5]);
+
+	extern char exc_gen_entry[];
+	e->env_tf.stvec = exc_gen_entry; // 啊啊啊忘记加异常返回地址了，怪不得总是 sret 就卡住了
+
+	// printk("yield!\n");
+	// debug_env();
+	// print_tf(&e->env_tf);
+
+	// print_tf(&e->env_tf);
+	// e->env_tf.sepc = 0x0000000000400000;
+	// halt();
+	// printk("%016lx\n", PTE2PA(((u_long *)PAGE_TABLE)[0x400]));
+
+	int r = sbi_set_timer(time); // 时间不能太短，如果 10000000L 就会立刻中断
+	time += delta_time;
+	// printk("timer=%d\n", r);
+
+	// e->env_tf.sip &=~ SIP_STIP; // 不可以写入 sip，因为没用
+	e->env_tf.sie |= SIE_STIE;
+	e->env_tf.sstatus |= SSTATUS_SPIE; // 不可以 SIE，否则会立刻中断
+
+	// u_long sip;					// sip 不可写入！只能通过 ecall 来修改 sip
+	// asm volatile("csrr %0, sscratch" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+	// asm volatile("csrw sscratch, %0" : : "r"(0));
+	// asm volatile("csrr %0, sscratch" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+
+	// asm volatile("csrr %0, sie" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+	// asm volatile("csrw sie, %0" : : "r"(0));
+	// asm volatile("csrr %0, sie" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+
+	// asm volatile("csrr %0, sip" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+	// asm volatile("csrw sip, %0" : : "r"(0));
+
+	// u_long sip;
+	// asm volatile("csrr %0, sip" : "=r"(sip));
+	// printk("sip=%016lx\n", sip);
+
+	// asm volatile("csrs sie, %0" : : "r"(SIE_STIE));
+	// asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
 	asm volatile("add sp, %0, zero" : : "r"(&e->env_tf));
 	asm volatile("j ret_from_exception");
 }
@@ -667,10 +774,10 @@ void env_check() {
 
 // 	/* 'UENVS' and 'UPAGES' should have been correctly mapped in *template* page directory
 // 	 * 'base_pgdir'. */
-// 	for (page_addr = 0; page_addr < npage * sizeof(struct Page); page_addr += BY2PG) {
+// 	for (page_addr = 0; page_addr < npage * sizeof(struct Page); page_addr += PAGE_SIZE) {
 // 		assert(va2pa(base_pgdir, UPAGES + page_addr) == PADDR(pages) + page_addr);
 // 	}
-// 	for (page_addr = 0; page_addr < NENV * sizeof(struct Env); page_addr += BY2PG) {
+// 	for (page_addr = 0; page_addr < NENV * sizeof(struct Env); page_addr += PAGE_SIZE) {
 // 		assert(va2pa(base_pgdir, UENVS + page_addr) == PADDR(envs) + page_addr);
 // 	}
 // 	/* check env_setup_vm() work well */
