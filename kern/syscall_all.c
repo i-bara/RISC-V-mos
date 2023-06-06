@@ -31,11 +31,39 @@ int sys_print_cons(const void *s, u_long num) {
 	if (/* ((u_long)pa + num) > UTOP || ((u_long)pa) >= UTOP || */ (pa > pa + num)) {
 		return -E_INVAL;
 	}
+
+	if (ROUNDDOWN((u_long)s, PAGE_SIZE) == ROUNDDOWN((u_long)s + num, PAGE_SIZE)) {
+		u_long i;
+		for (i = 0; i < num; i++) {
+			printcharc(((char *)pa)[i]);
+		}
+		return 0;
+	}
 	
+	u_long remain = (u_long)s % PAGE_SIZE;
 	u_long i;
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < remain; i++) {
 		printcharc(((char *)pa)[i]);
 	}
+	num -= remain;
+	s += remain;
+	
+	while (num >= PAGE_SIZE) {
+		pa = get_pa(&cur_pgdir, (u_long)s);
+		for (i = 0; i < PAGE_SIZE; i++) {
+			printcharc(((char *)pa)[i]);
+		}
+		num -= PAGE_SIZE;
+		s += PAGE_SIZE;
+	}
+
+	if (num) {
+		pa = get_pa(&cur_pgdir, (u_long)s);
+		for (i = 0; i < num; i++) {
+			printcharc(((char *)pa)[i]);
+		}
+	}
+
 	return 0;
 }
 
@@ -146,11 +174,9 @@ int sys_mem_alloc(u_long envid, u_long va, u_long perm) {
 
 	/* Step 1: Check if 'va' is a legal user virtual address using 'is_illegal_va'. */
 	/* Exercise 4.4: Your code here. (1/3) */
-	printk("nyan! %016lx\n", va);
 	if (is_illegal_va(va)) {
 		return -E_INVAL;
 	}
-	printk("nyan!\n");
 
 	/* Step 2: Convert the envid to its corresponding 'struct Env *' using 'envid2env'. */
 	/* Hint: **Always** validate the permission in syscalls! */
@@ -296,19 +322,22 @@ int sys_exofork(void) {
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
 	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
 
+	int debug_i = 0;
 	for (u_long va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
 		// printk("%16lx\n", va);
 		if (is_mapped_page(&cur_pgdir, va)) {
-			printk("duppage %16lx\n", va);
+			printk("%016lx ", va);
+			if ((++debug_i) % 4 == 0) {
+				printk("\n");
+			}
 			alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
 			u_long pa = get_pa(&e->env_pgdir, va);
 			u_long curpa = get_pa(&cur_pgdir, va);
 			memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
 		}
 	}
-
-	printk("nyan! %016lx\n", e->env_id);
-	printk("nyan! %016lx\n", e->env_tf.sepc);
+	printk("\n");
+	printk("exofork %lx with epc=%016lx\n", e->env_id, e->env_tf.sepc);
 
 	e->env_status = ENV_NOT_RUNNABLE;
 	e->env_pri = curenv->env_pri;
@@ -395,7 +424,8 @@ int sys_set_trapframe(u_long envid, struct Trapframe *tf) {
  * 	This function will halt the system.
  */
 void sys_panic(char *msg) {
-	panic("%s", TRUP(msg));
+	u_long pa = get_pa(&cur_pgdir, (u_long)msg);
+	panic("%s", TRUP(pa)); // lab 4_6 找到的漏洞：在 RISC-V 中无法访问用户页面
 }
 
 /* Overview:

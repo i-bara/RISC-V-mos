@@ -81,7 +81,7 @@ void handle_exception(u_long err) {
 			panic("virtual memory out of range");
 		}
 
-		print_tf(tf);
+		// print_tf(tf);
 		if (is_mapped_page(&cur_pgdir, tval)) {
 			u_long pa = get_pa(&cur_pgdir, tval);
 			u_long perm = get_perm(&cur_pgdir, tval);
@@ -122,9 +122,8 @@ void handle_exception(u_long err) {
 			}
 		}
 
-		printk("cause=%d\n", cause);
 		debug_page_va(&cur_pgdir, tval);
-		printk("page fault in %016lx        env=%x at pc=%016lx\n", tval, curenv->env_id, epc);
+		printk("cause=%d      page fault in %016lx        env=%x at pc=%016lx\n", cause, tval, curenv->env_id, epc);
 		alloc_page_user(&cur_pgdir, curenv->env_asid, tval, PTE_R | PTE_W | PTE_U);
 		// printk("%016lx\n", tf);
 		// debug_page_user(&cur_pgdir);

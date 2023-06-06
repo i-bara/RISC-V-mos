@@ -34,7 +34,6 @@ static void __attribute__((noreturn)) cow_entry(struct Trapframe *tf) {
 	/* Hint: Use 'vpt' and 'VPN' to find the page table entry. If the 'perm' doesn't have
 	 * 'PTE_COW', launch a 'user_panic'. */
 	/* Exercise 4.13: Your code here. (1/6) */
-	debugf("%016lx\n", va);
 	perm = pt0[va >> VPN0_SHIFT] & PTE_PERM;
 	if (!(perm & PTE_COW)) {
 		user_panic("wwwwwwwwwww");

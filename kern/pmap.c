@@ -872,8 +872,8 @@ map:
 	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
 	pp->pp_ref++;
 
-	printk("alloc %x\n", va, curenv->env_id);
-	debug_page_va(pgdir, va);
+	// printk("alloc %x\n", va, curenv->env_id);
+	// debug_page_va(pgdir, va);
 
 	return 0;
 }
@@ -1031,7 +1031,7 @@ create_pte0:
 	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 	// 建立自映射
-	printk(" self m %016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
+	// printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
 	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
 	get_pa(pgdir, va);
 	// debug_page(pgdir);
@@ -1040,17 +1040,15 @@ create_pte0:
 map:
 	tlb_invalidate(asid, va);
 	try(page_alloc(&pp));
-	printk(" m %016lx->%016lx\n", va, perm);
 	
 	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
-	printk(" m %016lx->%016lx\n", va, *pte0);
 	pp->pp_ref++;
 
-	if (curenv) {
-		printk("alloc in env %x\n", curenv->env_id);
-	} else {
-		printk("alloc in kernel\n");
-	}
+	// if (curenv) {
+	// 	printk("alloc in env %x\n", curenv->env_id);
+	// } else {
+	// 	printk("alloc in kernel\n");
+	// }
 	
 	debug_page_va(pgdir, va);
 
