@@ -87,7 +87,7 @@ int pipe(int pfd[2]);
 int pipe_is_closed(int fdnum);
 
 // pageref.c
-int pageref(void *);
+int pageref(u_long);
 
 // fprintf.c
 int fprintf(int fd, const char *fmt, ...);

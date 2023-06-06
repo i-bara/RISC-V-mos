@@ -8,12 +8,13 @@ USERLIB              := entry.o \
 			libos.o \
 			fork.o \
 			syscall_lib.o \
+			pageref.o \
 			ipc.o
+# pageref 提前到了 lab 4，用来调试
 
 ifeq ($(call lab-ge,5), true)
 	INITAPPS     += devtst.x fstest.x
 	USERLIB      += fd.o \
-			pageref.o \
 			file.o \
 			pipe.o \
 			fsipc.o \

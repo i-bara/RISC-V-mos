@@ -1050,7 +1050,7 @@ map:
 	// 	printk("alloc in kernel\n");
 	// }
 	
-	debug_page_va(pgdir, va);
+	// debug_page_va(pgdir, va);
 
 	return 0;
 }

@@ -529,10 +529,8 @@ int sys_ipc_try_send(u_long envid, u_long value, u_long srcva, u_long perm) {
 
 		/* Step 5: Map the physical page at 'dstva' in the address space of 'dstid'. */
 		// return page_insert(dstenv->env_pgdir, dstenv->env_asid, pp, dstva, perm);
-		printk("ipc: %x: %016lx->%x: %016lx(%016lx)\n", e->env_id, e->env_ipc_dstva, curenv->env_id, srcva, pa);
-		int r = map_page_user(&e->env_pgdir, e->env_asid, e->env_ipc_dstva, pa, perm);
-		debug_page_va(&e->env_pgdir, e->env_ipc_dstva);
-		return r;
+		// printk("ipc: %x: %016lx->%x: %016lx(%016lx)\n", e->env_id, e->env_ipc_dstva, curenv->env_id, srcva, pa);
+		return map_page_user(&e->env_pgdir, e->env_asid, e->env_ipc_dstva, pa, perm);
 
 	}
 	return 0;

@@ -47,7 +47,7 @@ void srv(u_int pvt) {
 		}
 		syscall_mem_unmap(0, buf);
 		while (1) {
-			buf += BY2PG >> 2; // avoiding tlb issues
+			buf += PAGE_SIZE >> 2; // avoiding tlb issues
 			u_int who = 0, perm = 0;
 			u_int n = ipc_recv(&who, buf, &perm);
 			uassert((perm & PTE_V));
@@ -56,11 +56,21 @@ void srv(u_int pvt) {
 			for (i = 0; i < n; ++i) {
 				u_int dst = buf[i << 1];
 				u_int v = buf[i << 1 | 1];
+				// for (int j = 0; j < i; j++) {
+				// 	debugf("K env=%x %x, %x\n", env->env_id, buf[j << 1 | 1], buf[j << 1]);
+				// }
+				// debugf("K env=%x %x, %x       i=%d\n", env->env_id, buf[i << 1 | 1], buf[i << 1]  , i );
+				// debugf("D env=%x %x == %x + %x\n", env->env_id, v, who, dst);
 				uassert(v == who + dst);
 				ipc_send(dst, v - who + me + me, 0, PTE_R | PTE_U);
 			}
 		}
 	} else {
+		// for (int j = 0; j < i; j++) {
+		// 	debugf("H env=%x %x, %x\n", env->env_id, buf[j << 1 | 1], buf[j << 1]);
+		// }
+		// debugf("H env=%x %x, %x\n", env->env_id, buf[i << 1 | 1], buf[i << 1]);
+		buf[i << 1 | 1] = 0x199;
 		ipc_send(pvt, tot >> 1, buf, PTE_V | PTE_R | PTE_U);
 	}
 }

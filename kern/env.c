@@ -197,6 +197,21 @@ void env_init(void) {
 	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), PAGE_SIZE),
 		    PTE_R | PTE_G | PTE_U);
 	map_pages(&base_pgdir, 0, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X);
+
+	// for (u_long pa = KERNBASE + 0x0000000; pa < KERNBASE + MEMORY_SIZE; pa += PAGE_SIZE) {
+	// 	if (pa2page(pa)->pp_ref != 1) {
+	// 		printk("pa=%016lx  ref=%d\n", pa, pa2page(pa)->pp_ref);
+	// 	}
+	// 	assert(pa2page(pa)->pp_ref == 0);
+	// }
+
+	// halt(); // 此段用来测试 page_ref，所有的 page_ref 都会比原来多 1
+
+	for (u_long pa = KERNBASE + 0x0000000; pa < KERNBASE + MEMORY_SIZE; pa += PAGE_SIZE) { // 减回 1 就行了
+		pa2page(pa)->pp_ref--;
+	}
+
+
 	// printk("base is %016lx\n", base_pgdir);
 
 	// debug_page(&base_pgdir);
