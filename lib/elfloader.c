@@ -52,27 +52,27 @@ int elf_load_seg(Elf32_Phdr *ph, const void *bin, elf_mapper_t mapper, void *dat
 
 	int r;
 	size_t i;
-	u_long offset = va - ROUNDDOWN(va, BY2PG);
+	u_long offset = va - ROUNDDOWN(va, PAGE_SIZE);
 	if (offset != 0) {
-		if ((r = mapper(data, va, offset, perm, bin, MIN(bin_size, BY2PG - offset))) !=
+		if ((r = mapper(data, va, offset, perm, bin, MIN(bin_size, PAGE_SIZE - offset))) !=
 		    0) {
 			return r;
 		}
 	}
 
 	/* Step 1: load all content of bin into memory. */
-	for (i = offset ? MIN(bin_size, BY2PG - offset) : 0; i < bin_size; i += BY2PG) {
-		if ((r = mapper(data, va + i, 0, perm, bin + i, MIN(bin_size - i, BY2PG))) != 0) {
+	for (i = offset ? MIN(bin_size, PAGE_SIZE - offset) : 0; i < bin_size; i += PAGE_SIZE) {
+		if ((r = mapper(data, va + i, 0, perm, bin + i, MIN(bin_size - i, PAGE_SIZE))) != 0) {
 			return r;
 		}
 	}
 
 	/* Step 2: alloc pages to reach `sgsize` when `bin_size` < `sgsize`. */
 	while (i < sgsize) {
-		if ((r = mapper(data, va + i, 0, perm, NULL, MIN(bin_size - i, BY2PG))) != 0) {
+		if ((r = mapper(data, va + i, 0, perm, NULL, MIN(bin_size - i, PAGE_SIZE))) != 0) {
 			return r;
 		}
-		i += BY2PG;
+		i += PAGE_SIZE;
 	}
 	return 0;
 }
@@ -97,27 +97,27 @@ int elf_load_seg_64(Elf64_Phdr *ph, const void *bin, elf_mapper_t mapper, void *
 
 	int r;
 	size_t i;
-	u_long offset = va - ROUNDDOWN(va, BY2PG);
+	u_long offset = va - ROUNDDOWN(va, PAGE_SIZE);
 	if (offset != 0) {
-		if ((r = mapper(data, va, offset, perm, bin, MIN(bin_size, BY2PG - offset))) !=
+		if ((r = mapper(data, va, offset, perm, bin, MIN(bin_size, PAGE_SIZE - offset))) !=
 		    0) {
 			return r;
 		}
 	}
 
 	/* Step 1: load all content of bin into memory. */
-	for (i = offset ? MIN(bin_size, BY2PG - offset) : 0; i < bin_size; i += BY2PG) {
+	for (i = offset ? MIN(bin_size, PAGE_SIZE - offset) : 0; i < bin_size; i += PAGE_SIZE) {
 		// printk("%016lx->%016lx\n", )
-		if ((r = mapper(data, va + i, 0, perm, bin + i, MIN(bin_size - i, BY2PG))) != 0) {
+		if ((r = mapper(data, va + i, 0, perm, bin + i, MIN(bin_size - i, PAGE_SIZE))) != 0) {
 			return r;
 		}
 	}
 	/* Step 2: alloc pages to reach `sgsize` when `bin_size` < `sgsize`. */
 	while (i < sgsize) {
-		if ((r = mapper(data, va + i, 0, perm, NULL, MIN(bin_size - i, BY2PG))) != 0) {
+		if ((r = mapper(data, va + i, 0, perm, NULL, MIN(bin_size - i, PAGE_SIZE))) != 0) {
 			return r;
 		}
-		i += BY2PG;
+		i += PAGE_SIZE;
 	}
 	
 	return 0;

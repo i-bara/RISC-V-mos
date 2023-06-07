@@ -59,9 +59,10 @@
 
 // #define PDMAP (1 << PDSHIFT)
 #define PAGE_SIZE (1 << VPN0_SHIFT)
+#define LARGE_PAGE_SIZE (1 << VPN1_SHIFT)
 
-#define BY2PG  (1 << PPN0_SHIFT)
-#define BY2PG1 (1 << PPN1_SHIFT)
-#define BY2PG2 (1 << PPN2_SHIFT)
+#define BY2PG PAGE_SIZE
+// #define BY2PG1 (1 << PPN1_SHIFT)
+// #define BY2PG2 (1 << PPN2_SHIFT)
 
 #endif /* !_SV39_H_ */

@@ -96,7 +96,7 @@
 
 #define PAGE_TABLE 0xc0000000
 #define PPT 0x3
-#define PAGES (ENVS + BY2PG1)
+#define PAGES (ENVS + LARGE_PAGE_SIZE)
 #define ENVS 0x100000000L
 #define PENVS 0x4
 
@@ -106,8 +106,8 @@
 #define ULIM 0x80000000
 
 // #define UVPT (ULIM - BY2PG2)
-// #define UPAGES (UVPT - BY2PG1)
-// #define UENVS (UPAGES - BY2PG1)
+// #define UPAGES (UVPT - LARGE_PAGE_SIZE)
+// #define UENVS (UPAGES - LARGE_PAGE_SIZE)
 
 #define UTOP ULIM
 #define UXSTACKTOP UTOP
