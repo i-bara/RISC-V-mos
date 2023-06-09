@@ -58,6 +58,16 @@ void yay() {
     printk("dddddddddddd!\n");
 }
 
+void handle_interrupt() {
+	u_long sip;
+	asm volatile("csrr %0, sip " : "=r"(sip));
+	if (sip & 0x0000000000000020) {
+		schedule(0);
+	}
+	printk("sip=%016lx\n", sip);
+	halt;
+}
+
 void handle_exception(u_long err) {
 	struct Trapframe *tf = (struct Trapframe *)KSTACKTOP - 1;
 	// print_tf(tf);
@@ -70,6 +80,9 @@ void handle_exception(u_long err) {
     asm volatile("csrr %0, stval " : "=r"(tval));
 
 	// printk("Exception: cause=%ld\n", cause);
+	// printk("epc=%016lx\n", epc);
+	// printk("status=%016lx\n", status);
+	// printk("tval=%016lx\n", tval);
 
 	if (cause == 8) {
 		do_syscall(tf);
@@ -122,9 +135,8 @@ void handle_exception(u_long err) {
 			}
 		}
 
-		debug_page_va(&cur_pgdir, tval);
-		printk("cause=%d      page fault in %016lx        env=%x at pc=%016lx\n", cause, tval, curenv->env_id, epc);
 		alloc_page_user(&cur_pgdir, curenv->env_asid, tval, PTE_R | PTE_W | PTE_U);
+		printk("cause=%d      page fault in %016lx->%016lx        env=%x at pc=%016lx\n", cause, tval, get_pa(&cur_pgdir, tval), curenv->env_id, epc);
 		// printk("%016lx\n", tf);
 		// debug_page_user(&cur_pgdir);
 		

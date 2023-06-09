@@ -7,10 +7,10 @@
 
 #define MAXFD 32
 #define FILEBASE 0x60000000
-#define FDTABLE (FILEBASE - PDMAP)
+#define FDTABLE (FILEBASE - LARGE_PAGE_SIZE)
 
 #define INDEX2FD(i) (FDTABLE + (i)*BY2PG)
-#define INDEX2DATA(i) (FILEBASE + (i)*PDMAP)
+#define INDEX2DATA(i) (FILEBASE + (i)*LARGE_PAGE_SIZE)
 
 // pre-declare for forward references
 struct Fd;
@@ -55,7 +55,7 @@ struct Filefd {
 
 int fd_alloc(struct Fd **fd);
 int fd_lookup(int fdnum, struct Fd **fd);
-void *fd2data(struct Fd *);
+u_long fd2data(struct Fd *);
 int fd2num(struct Fd *);
 int dev_lookup(int dev_id, struct Dev **dev);
 int num2fd(int fd);

@@ -197,6 +197,7 @@ void env_init(void) {
 	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), PAGE_SIZE),
 		    PTE_R | PTE_G | PTE_U);
 	map_pages(&base_pgdir, 0, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X);
+	map_pages(&base_pgdir, 0, 0x10001000, 0xb0001000, 0x0000000000008000, PTE_R | PTE_W | PTE_X);
 
 	// for (u_long pa = KERNBASE + 0x0000000; pa < KERNBASE + MEMORY_SIZE; pa += PAGE_SIZE) {
 	// 	if (pa2page(pa)->pp_ref != 1) {
@@ -210,7 +211,6 @@ void env_init(void) {
 	for (u_long pa = KERNBASE + 0x0000000; pa < KERNBASE + MEMORY_SIZE; pa += PAGE_SIZE) { // 减回 1 就行了
 		pa2page(pa)->pp_ref--;
 	}
-
 
 	// printk("base is %016lx\n", base_pgdir);
 
@@ -247,6 +247,8 @@ void env_init(void) {
 	asm volatile("csrw satp, %0" : : "r"(satp));
 	
 	printk("OK!\n");
+
+	virtio_init();
 
 	asid_bitmap[0] |= 1; // 占用 asid == 0
 }

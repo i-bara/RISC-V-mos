@@ -35,15 +35,8 @@ exception_handler:
 	
 
 interrupt_handler:
-	# li		a0, SIP_STIP
-	# csrc	sip, a0
-
-
-	# PRINT_REGS
-
-
-	li      a0, 0
-	la		t0, schedule
+	# li      a0, 0
+	la		t0, handle_interrupt
 	jalr    t0
 
 

@@ -85,6 +85,11 @@ clean:
 # endif
 
 run: qemu_flags += -bios qemu/opensbi-riscv64-generic-fw_dynamic.bin -kernel $(qemu_files) -machine virt -m 64M -nographic
+
+ifeq ($(call lab-ge,5),true)
+	qemu_flags += -global virtio-mmio.force-legacy=false -device virtio-blk-device,drive=hd -drive file=target/fs.img,if=none,format=raw,id=hd
+endif
+
 run:
 	qemu/qemu-system-riscv64 $(qemu_flags)
 

@@ -883,8 +883,8 @@ int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
 		panic("invalid perm");
 	}
 
-	if (pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) { 
-		return -E_INVAL;
+	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 
+		panic("invalid phisical memory");
 	}
 	u_long vpn0 = VPN0(va);
 	u_long vpn1 = VPN1(va);
@@ -956,7 +956,9 @@ create_pte0:
 map:
 	tlb_invalidate(asid, va);
 	*pte0 = PA2PTE(pa) | perm | PTE_V;
-	pa2page(pa)->pp_ref++;
+	if ((pa >= KERNBASE && pa < KERNBASE + MEMORY_SIZE)) { 
+		pa2page(pa)->pp_ref++; // 只有内存才有页控制块
+	}
 
 	return 0;
 }
@@ -1060,8 +1062,8 @@ int map_page_user(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
 		panic("invalid perm");
 	}
 
-	if (pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) { 
-		return -E_INVAL;
+	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 
+		panic("invalid phisical memory");
 	}
 	u_long vpn0 = VPN0(va);
 	u_long vpn1 = VPN1(va);
@@ -1143,7 +1145,9 @@ create_pte0:
 map:
 	tlb_invalidate(asid, va);
 	*pte0 = PA2PTE(pa) | perm | PTE_V;
-	pa2page(pa)->pp_ref++;
+	if ((pa >= KERNBASE && pa < KERNBASE + MEMORY_SIZE)) { 
+		pa2page(pa)->pp_ref++; // 只有内存才有页控制块
+	}
 
 	return 0;
 }

@@ -65,12 +65,14 @@ int syscall_cgetc() {
 	return msyscall(SYS_cgetc);
 }
 
-int syscall_write_dev(void *va, u_int dev, u_int len) {
-	/* Exercise 5.2: Your code here. (1/2) */
-
+int syscall_read_sector(u_long va, le64 sector) {
+	return msyscall(SYS_read_sector, va, sector);
 }
 
-int syscall_read_dev(void *va, u_int dev, u_int len) {
-	/* Exercise 5.2: Your code here. (2/2) */
+int syscall_write_sector(u_long va, le64 sector) {
+	return msyscall(SYS_write_sector, va, sector);
+}
 
+int syscall_flush() {
+	return msyscall(SYS_flush);
 }

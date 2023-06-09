@@ -593,6 +593,95 @@ int sys_read_dev(u_long va, u_long pa, u_long len) {
 	return 0;
 }
 
+#include <virtio.h>
+
+int sys_read_sector(u_long va, le64 sector) {
+	if (!is_mapped_page(&cur_pgdir, va)) {
+		alloc_page(&cur_pgdir, curenv->env_asid, va, PTE_R | PTE_W | PTE_U);
+	}
+	u_long pa = get_pa(&cur_pgdir, va);
+	
+	if (va >> VPN0_SHIFT != (va + SECTOR_SIZE - 1) >> VPN0_SHIFT) {
+		u_long offset = (va &~ (PAGE_SIZE - 1)) + PAGE_SIZE - va;
+		if (!is_mapped_page(&cur_pgdir, va + SECTOR_SIZE)) {
+			alloc_page(&cur_pgdir, curenv->env_asid, va + SECTOR_SIZE, PTE_R | PTE_W | PTE_U);
+		}
+		u_long pa_end = get_pa(&cur_pgdir, va + SECTOR_SIZE);
+
+		u_long diskva = 0xb0008000;
+		struct Virtio *disk = (struct Virtio *)diskva;
+		read_sector(disk, sector);
+
+		memcpy((void *)pa, (void *)&read_buffer.data, offset);
+		memcpy((void *)pa_end - SECTOR_SIZE + offset, (void *)((u_long)&read_buffer.data + offset), SECTOR_SIZE - offset);
+
+		if (read_buffer.status != 0) {
+			panic("Write sector failed!");
+		}
+		return 0;
+	}
+
+	u_long diskva = 0xb0008000;
+	struct Virtio *disk = (struct Virtio *)diskva;
+	read_sector(disk, sector);
+
+	memcpy((void *)pa, (void *)&read_buffer.data, SECTOR_SIZE);
+
+	if (read_buffer.status != 0) {
+		panic("Write sector failed!");
+	}
+	return 0;
+}
+
+int sys_write_sector(u_long va, le64 sector) {
+	if (!is_mapped_page(&cur_pgdir, va)) {
+		alloc_page(&cur_pgdir, curenv->env_asid, va, PTE_R | PTE_W | PTE_U);
+	}
+	u_long pa = get_pa(&cur_pgdir, va);
+
+	if (va >> VPN0_SHIFT != (va + SECTOR_SIZE - 1) >> VPN0_SHIFT) {
+		u_long offset = (va &~ (PAGE_SIZE - 1)) + PAGE_SIZE - va;
+		if (!is_mapped_page(&cur_pgdir, va + SECTOR_SIZE)) {
+			alloc_page(&cur_pgdir, curenv->env_asid, va + SECTOR_SIZE, PTE_R | PTE_W | PTE_U);
+		}
+		u_long pa_end = get_pa(&cur_pgdir, va + SECTOR_SIZE);
+
+		memcpy((void *)&write_buffer.data, (void *)pa, offset);
+		memcpy((void *)((u_long)&write_buffer.data + offset), (void *)pa_end - SECTOR_SIZE + offset, SECTOR_SIZE - offset);
+
+		u_long diskva = 0xb0008000;
+		struct Virtio *disk = (struct Virtio *)diskva;
+		write_sector(disk, sector);
+
+		if (write_buffer.status != 0) {
+			panic("Write sector failed!");
+		}
+		return 0;
+	}
+
+	memcpy((void *)&write_buffer.data, (void *)pa, SECTOR_SIZE);
+
+	u_long diskva = 0xb0008000;
+	struct Virtio *disk = (struct Virtio *)diskva;
+	write_sector(disk, sector);
+
+	if (write_buffer.status != 0) {
+		panic("Write sector failed!");
+	}
+	return 0;
+}
+
+int sys_flush() {
+	u_long diskva = 0xb0008000;
+	struct Virtio *disk = (struct Virtio *)diskva;
+	flush(disk);
+
+	if (flush_buffer.status != 0) {
+		panic("Flush sector failed!");
+	}
+	return 0;
+}
+
 void *syscall_table[MAX_SYSNO] = {
     [SYS_putchar] = sys_putchar,
     [SYS_print_cons] = sys_print_cons,
@@ -612,6 +701,9 @@ void *syscall_table[MAX_SYSNO] = {
     [SYS_cgetc] = sys_cgetc,
     [SYS_write_dev] = sys_write_dev,
     [SYS_read_dev] = sys_read_dev,
+	[SYS_read_sector] = sys_read_sector,
+	[SYS_write_sector] = sys_write_sector,
+	[SYS_flush] = sys_flush,
 };
 
 /* Overview:

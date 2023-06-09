@@ -18,7 +18,6 @@ extern int main(int, char **);
 void libmain(int argc, char **argv) {
 	// set env to point at our env structure in envs[].
 	debugf("Hello, world!\n");
-
 	env = &envs[ENVX(syscall_getenvid())];
 
 	debugf("Hello, world! envid=%016lx\n", env->env_id);

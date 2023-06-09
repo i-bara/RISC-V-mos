@@ -22,6 +22,9 @@ enum {
 	SYS_cgetc,
 	SYS_write_dev,
 	SYS_read_dev,
+	SYS_read_sector,
+	SYS_write_sector,
+	SYS_flush,
 	MAX_SYSNO,
 };
 
