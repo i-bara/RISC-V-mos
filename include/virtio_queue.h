@@ -13,10 +13,10 @@
 #include <stdint.h>
 
 // 加了个这个
-typedef u_long le64;
-typedef u_int le32;
-typedef u_short le16;
-typedef u_char u8;
+typedef u_long volatile le64; // 在这里防止编译器优化
+typedef u_int volatile le32;
+typedef u_short volatile le16;
+typedef u_char volatile u8;
 
 // 还有这个
 #define QUEUE_SIZE 1024
