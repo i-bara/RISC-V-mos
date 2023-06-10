@@ -99,7 +99,8 @@ void handle_exception(u_long err) {
 			u_long pa = get_pa(&cur_pgdir, tval);
 			u_long perm = get_perm(&cur_pgdir, tval);
 
-			debug_page_va(&cur_pgdir, tval);
+			// printk("%d: ", cause);
+			// debug_page_va(&cur_pgdir, tval);
 
 			if (cause == 12) {
 				map_page(&cur_pgdir, curenv->env_asid, tval, pa, perm | PTE_X);
@@ -113,12 +114,12 @@ void handle_exception(u_long err) {
 			if (get_perm(&cur_pgdir, tval) & PTE_COW) {
 				
 				if (!is_mapped_page(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long))) {
-					printk("alloc uxstacktop!\n");
+					printk("%x: alloc uxstacktop\n", curenv->env_id);
 					alloc_page_user(&cur_pgdir, curenv->env_asid, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long), PTE_R | PTE_W | PTE_U);
 				}
+				printk("%x: cow %016lx\n", curenv->env_id, tval);
 
 				u_long pa = get_pa(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long));
-				printk("pa=%016lx\n", pa);
 				*(struct Trapframe *)(pa + sizeof(u_long)) = *tf;
 				*(u_long *)pa = (u_long)tf;
 				
@@ -143,10 +144,17 @@ void handle_exception(u_long err) {
 		asm volatile("add sp, %0, zero" : : "r"(tf));
 		asm volatile("j ret_from_exception");
 	} else {
-		printk("Exception: cause=%ld\n", cause);
+		printk("Exception: cause=%ld (", cause);
+		if (cause == 2) {
+			printk("Illegal instruction");
+		} else {
+			printk("Unknown");
+		}
+		printk(")\n");
 		printk("epc=%016lx\n", epc);
 		printk("status=%016lx\n", status);
 		printk("tval=%016lx\n", tval);
+		printk("env=%08x\n", curenv->env_id);
 		halt();
 	}
     

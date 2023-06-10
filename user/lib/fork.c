@@ -154,7 +154,7 @@ int fork(void) {
 	
 	if (child == 0) {
 		env = envs + ENVX(syscall_getenvid());
-		debugf("fork! %016lx\n", env->env_id);
+		debugf("%x: Hello, fork!\n", env->env_id);
 		return 0;
 	}
 

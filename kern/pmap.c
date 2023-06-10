@@ -706,15 +706,12 @@ u_long get_pa(u_long *pgdir, u_long va) {
 	// printk("%016lx: %016lx: %016lx\n", vpn2, vpn1, vpn0);
 
 	u_long *pte2 = &((u_long *)*pgdir)[vpn2];
-	if (va==0x3ff000) printk("pte2 = %016lx: %016lx\n", pte2, *pte2);
 
 	if (*pte2 & PTE_V) {
 		u_long *pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
-		if (va==0x3ff000) printk("pte1 = %016lx: %016lx\n", pte1, *pte1);
 
 		if (*pte1 & PTE_V) {
 			u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
-			if (va==0x3ff000) printk("pte0 = %016lx: %016lx\n", pte0, *pte0);
 
 			if (*pte0 & PTE_V) {
 				return PTE2PA(*pte0) | va & PTE_OFFSET;
@@ -803,7 +800,7 @@ void set_perm(u_long *pgdir, u_long va, u_long perm) {
 
 int alloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm) {
 	if (perm >= 0x400) {
-		panic("invalid perm");
+		panic("invalid perm: %08x", perm);
 	}
 	
 	u_long vpn0 = VPN0(va);
@@ -880,7 +877,7 @@ map:
 
 int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
 	if (perm >= 0x400) {
-		panic("invalid perm");
+		panic("invalid perm: %08x", perm);
 	}
 
 	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 
@@ -965,7 +962,7 @@ map:
 
 int alloc_page_user(u_long *pgdir, u_int asid, u_long va, u_int perm) {
 	if (perm >= 0x400) {
-		panic("invalid perm");
+		panic("invalid perm: %08x", perm);
 	}
 
 	u_long vpn0 = VPN0(va);
@@ -1059,7 +1056,7 @@ map:
 
 int map_page_user(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
 	if (perm >= 0x400) {
-		panic("invalid perm");
+		panic("invalid perm: %08x", perm);
 	}
 
 	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 

@@ -39,20 +39,20 @@ int pipe(int pfd[2]) {
 	struct Fd *fd0, *fd1;
 
 	/* Step 1: Allocate the file descriptors. */
-	if ((r = fd_alloc(&fd0)) < 0 || (r = syscall_mem_alloc(0, fd0, PTE_D | PTE_LIBRARY)) < 0) {
+	if ((r = fd_alloc(&fd0)) < 0 || (r = syscall_mem_alloc(0, fd0, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err;
 	}
 
-	if ((r = fd_alloc(&fd1)) < 0 || (r = syscall_mem_alloc(0, fd1, PTE_D | PTE_LIBRARY)) < 0) {
+	if ((r = fd_alloc(&fd1)) < 0 || (r = syscall_mem_alloc(0, fd1, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err1;
 	}
 
 	/* Step 2: Allocate and map the page for the 'Pipe' structure. */
 	va = fd2data(fd0);
-	if ((r = syscall_mem_alloc(0, (void *)va, PTE_D | PTE_LIBRARY)) < 0) {
+	if ((r = syscall_mem_alloc(0, (void *)va, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err2;
 	}
-	if ((r = syscall_mem_map(0, (void *)va, 0, (void *)fd2data(fd1), PTE_D | PTE_LIBRARY)) <
+	if ((r = syscall_mem_map(0, (void *)va, 0, (void *)fd2data(fd1), PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) <
 	    0) {
 		goto err3;
 	}

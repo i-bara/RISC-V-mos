@@ -1,5 +1,4 @@
 #include <lib.h>
-
 #define TMPVA ((char *)0x50005000)
 const char *msg = "hello world!\n";
 const char *msg2 = "goodbye ,world!\n";
@@ -12,7 +11,7 @@ int main(int argc, char **argv) {
 		childofspawn();
 	}
 
-	if ((r = syscall_mem_alloc(0, TMPVA, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
+	if ((r = syscall_mem_alloc(0, TMPVA, PTE_D | PTE_LIBRARY)) < 0) {
 		user_panic("syscall error!");
 	}
 	if ((r = fork()) < 0) {
@@ -30,11 +29,9 @@ int main(int argc, char **argv) {
 	} else {
 		user_panic("sorry , your fork may be wrong\n");
 	}
-	debugf("spawnnnnnnnn!\n");
 	if ((r = spawnl("testptelibrary.b", "testptelibrary", "arg", 0)) < 0) {
 		user_panic("spawn wrong: %d", r);
 	}
-	debugf("child = %x\n", r);
 	wait(r);
 	if (strcmp(TMPVA, msg2) == 0) {
 		debugf("spawn solved the problem of PTE_LIBRARY,congratulations!\n");

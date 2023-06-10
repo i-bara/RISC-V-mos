@@ -20,7 +20,7 @@ struct Env_sched_list env_sched_list; // Runnable list
 
 u_long base_pgdir;
 
-static u_long delta_time = 10000000L;
+static u_long delta_time = 30000L;
 static u_long time = 20000000L;
 
 static uint32_t asid_bitmap[NASID / 32] = {0}; // 64
@@ -449,7 +449,7 @@ static void load_icode(struct Env *e, const void *binary, size_t size) {
 	size_t ph_off;
 	ELF_FOREACH_PHDR_OFF (ph_off, ehdr) {
 		printk("elf!\n");
-		Elf64_Phdr *ph = (Elf32_Phdr *)(binary + ph_off);
+		Elf64_Phdr *ph = (Elf64_Phdr *)(binary + ph_off);
 		if (ph->p_type == PT_LOAD) {
 			// 'elf_load_seg' is defined in lib/elfloader.c
 			// 'load_icode_mapper' defines the way in which a page in this segment

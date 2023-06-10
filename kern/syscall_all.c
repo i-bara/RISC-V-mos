@@ -322,22 +322,21 @@ int sys_exofork(void) {
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
 	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
 
-	int debug_i = 0;
+	// int debug_i = 0; // 测试页表复制 (1/3)
 	for (u_long va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
-		// printk("%16lx\n", va);
 		if (is_mapped_page(&cur_pgdir, va)) {
-			printk("%016lx ", va);
-			if ((++debug_i) % 4 == 0) {
-				printk("\n");
-			}
+			// printk("%016lx ", va); // 测试页表复制 (2/3)
+			// if ((++debug_i) % 4 == 0) {
+			// 	printk("\n");
+			// }
 			alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
 			u_long pa = get_pa(&e->env_pgdir, va);
 			u_long curpa = get_pa(&cur_pgdir, va);
 			memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
 		}
 	}
-	printk("\n");
-	printk("exofork %lx with epc=%016lx\n", e->env_id, e->env_tf.sepc);
+	// printk("\n"); // 测试页表复制 (3/3)
+	printk("%x: exofork %lx with epc=%016lx\n", curenv->env_id, e->env_id, e->env_tf.sepc);
 
 	e->env_status = ENV_NOT_RUNNABLE;
 	e->env_pri = curenv->env_pri;
@@ -394,7 +393,11 @@ int sys_set_env_status(u_long envid, u_long status) {
  *  Returns the original error if other underlying calls fail.
  */
 int sys_set_trapframe(u_long envid, struct Trapframe *tf) {
-	printk("set trap\n");
+	// if (envid == 0) { // 测试 set_trapframe：当且仅当 cow 或者 spawn 时会调用这个，所以删掉了
+	// 	printk("%x: set trapframe\n", curenv->env_id);
+	// } else {
+	// 	printk("%x: set trapframe\n", envid);
+	// }
 
 	if (is_illegal_va_range((u_long)tf, sizeof *tf)) {
 		return -E_INVAL;
@@ -404,8 +407,8 @@ int sys_set_trapframe(u_long envid, struct Trapframe *tf) {
 	tf = (struct Trapframe *)pa;
 	
 	struct Env *env;
-	try(envid2env(envid, &env, 1));
-	printk("equal %x\n", env);
+	try(envid2env(envid, &env, curenv->env_id)); // lab 6: 给父进程赋予权限
+
 	if (env == curenv) {
 		*((struct Trapframe *)KSTACKTOP - 1) = *tf;
 		// return `tf->regs[10]` instead of 0, because return value overrides regs[10] on
@@ -539,7 +542,7 @@ int sys_ipc_try_send(u_long envid, u_long value, u_long srcva, u_long perm) {
 // XXX: kernel does busy waiting here, blocking all envs
 int sys_cgetc(void) {
 	int ch;
-	while ((ch = scancharc()) == 0) {
+	while ((ch = scancharc()) == 255) { // 把 0 改成 255，这是因为 sbi 规定没有输入返回 255
 	}
 	return ch;
 }
