@@ -5,6 +5,14 @@
 #include <memory.h>
 #include <asm/sv39.h>
 
+#define DEBUG 0
+
+#ifdef DEBUG
+#if (DEBUG >= 3)
+#define DEBUG_ELF
+#endif
+#endif
+
 // #define BY2PG 4096		// bytes to a page
 // #define PDMAP (4 * 1024 * 1024) // bytes mapped by a page directory entry
 // #define PGSHIFT 12

@@ -18,19 +18,37 @@ struct virtio_blk_req flush_buffer;
 void virtio_init() {
 	for (u_long diskva = 0xb0001000; diskva < 0xb0009000; diskva += 0x1000) {
 		struct Virtio *disk = (struct Virtio *)diskva;
-		printk("%016lx\n", disk->device_id);
+		printk("virtio %d: ", (diskva - 0xb0001000) >> 12);
+		if (disk->device_id == 0) {
+			printk("Unavailable");
+		} else if (disk->device_id == 1) {
+			printk("Network Device");
+		} else if (disk->device_id == 2) {
+			printk("Block Device");
+		} else if (disk->device_id == 3) {
+			printk("Console Device");
+		} else if (disk->device_id == 4) {
+			printk("Entropy Device");
+		} else if (disk->device_id == 5) {
+			printk("Traditional Memory Balloon Device");
+		} else if (disk->device_id == 6) {
+			printk("SCSI Host Device");
+		} else {
+			printk("Unknown");
+		}
+		printk("\n");
 	}
 
 	u_long diskva = 0xb0008000; // 映射到了这个虚拟地址
 	struct Virtio *disk = (struct Virtio *)diskva;
-	printk("%016lx\n", disk->queue_num_max);
+	printk("queue num max    : %016lx\n", disk->queue_num_max);
 
 	u_int magic_value = disk->magic_value;
 	u_int version = disk->version;
 	u_int device_id = disk->device_id;
-	printk("magic value: %08x\n", magic_value);
-	printk("version: %08x\n", version);
-	printk("device id: %08x\n", device_id);
+	printk("magic value      : %08x\n", magic_value);
+	printk("version          : %08x\n", version);
+	printk("device id        : %08x\n", device_id);
 	assert(device_id == 2);
 
 	// The driver MUST follow this sequence to initialize a device:
@@ -48,7 +66,7 @@ void virtio_init() {
 	 * fields to check that it can support the device before accepting it.
 	*/
 	u_int device_features = disk->device_features;
-	printk("feature bits = %016lx\n", device_features);
+	printk("feature bits     : %016lx\n", device_features);
 	disk->driver_features = device_features;
 
 	// Set the FEATURES_OK status bit. The driver MUST NOT accept new feature bits after this step.
@@ -58,7 +76,7 @@ void virtio_init() {
 	 * Re-read device status to ensure the FEATURES_OK bit is still set: otherwise, the device does not
 	 * support our subset of features and the device is unusable.
 	*/
-	printk("status = %016lx\n", disk->status);
+	printk("status           : %016lx\n", disk->status);
 
 	/**
 	 * Perform device-specific setup, including discovery of virtqueues for the device, optional per-bus setup,
@@ -89,9 +107,9 @@ void virtio_init() {
 	disk->queue_avail = (u_long)avail;
 	disk->queue_used = (u_long)used;
 
-	printk("ready? %d!\n", disk->queue_ready);
+	assert(disk->queue_ready == 0);
 	disk->queue_ready = 1;
-	printk("ready? %d!\n", disk->queue_ready);
+	assert(disk->queue_ready == 1);
 	
 	read_buffer.type = VIRTIO_BLK_T_IN; // 读
 
@@ -144,7 +162,7 @@ void virtio_init() {
 	// for (int i = 0; i < 3; i++) {
 	// 	printk("%lx-%lx\n", desc[i].addr, desc[i].addr + desc[i].len);
 	// }
-	printk("device size: %lx\n", disk->config.capacity);
+	printk("device size      : %lx\n", disk->config.capacity);
 	printk("config generation: %d\n", disk->config_generation);
 	// printk("size=%d\n", (le32)sizeof(read_buffer));
 

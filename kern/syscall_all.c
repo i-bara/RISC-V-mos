@@ -110,7 +110,11 @@ int sys_env_destroy(u_long envid) {
 	struct Env *e;
 	try(envid2env(envid, &e, 1));
 
+	#ifdef DEBUG
+	#if (DEBUG >= 1)
 	printk("[%08x] destroying %08x\n", curenv->env_id, e->env_id);
+	#endif
+	#endif
 	env_destroy(e);
 	return 0;
 }
@@ -336,7 +340,11 @@ int sys_exofork(void) {
 		}
 	}
 	// printk("\n"); // 测试页表复制 (3/3)
+	#ifdef DEBUG
+	#if (DEBUG >= 2)
 	printk("%x: exofork %lx with epc=%016lx\n", curenv->env_id, e->env_id, e->env_tf.sepc);
+	#endif
+	#endif
 
 	e->env_status = ENV_NOT_RUNNABLE;
 	e->env_pri = curenv->env_pri;

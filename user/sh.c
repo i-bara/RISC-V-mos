@@ -222,7 +222,20 @@ void runcmd(char *s) {
 	if (child >= 0) {
 		wait(child);
 	} else {
+		#ifdef DEBUG
+		#if (DEBUG >= 1)
 		debugf("spawn %s: %d\n", argv[0], child);
+		#else
+		int len = strlen(argv[0]);
+		if (argv[0][len - 2] == '.' && argv[0][len - 1] == 'b') {
+			argv[0][len - 2] = '\0';
+			debugf("Mosh: Command not found: %s\n", argv[0]);
+			argv[0][len - 2] = '.';
+		} else {
+			debugf("Mosh: Command not found: %s\n", argv[0]);
+		}
+		#endif
+		#endif
 	}
 	if (rightpipe) {
 		wait(rightpipe);

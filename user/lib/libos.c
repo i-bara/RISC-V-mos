@@ -19,7 +19,11 @@ void libmain(int argc, char **argv) {
 	// set env to point at our env structure in envs[].
 	env = &envs[ENVX(syscall_getenvid())];
 
+	#ifdef DEBUG
+	#if (DEBUG >= 2)
 	debugf("%x: Hello, world!\n", env->env_id);
+	#endif
+	#endif
 
 	// call user main routine
 	main(argc, argv);

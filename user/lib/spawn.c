@@ -282,8 +282,12 @@ int spawnl(char *prog, char *args, ...) {
 	// Thanks to MIPS calling convention, the layout of arguments on the stack
 	// are straightforward.
 	// 但是 RISC-V 在第二个参数之后会紧接着 局部变量、fp 和 ra，并不是连续的，因此需要有所修改，具体修改不能在 init_stack 中实现，否则不经过 spawnl 的 spawn 会出问题
+	
+	#ifdef DEBUG_ELF
 	debug_hex(args, 8);
-	debug_hex(&args, 16);	
+	debug_hex(&args, 16);
+	#endif
+		
 	va_list ap;
 	va_start(ap, args);
 	char* s;

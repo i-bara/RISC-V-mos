@@ -14,31 +14,16 @@ END(handle_\exception)
 .section .text.exc_gen_entry
 exc_gen_entry:
 	SAVE_ALL
-	
-	
 	csrr	t0, scause
 	bltz	t0, interrupt_handler
 
 exception_handler:
-    li		t1, 100
-	li		t2, SCAUSE_EXC
-	and		t0, t0, t2
-	blt 	t0, t1, target
-	
-	la		a1, yay
-	jr      a1
-	target:
-	la		a1, handle_exception
-	csrr	a0, stval
-	addi	sp,	sp,	-4
-	jr      a1
-	
-
-interrupt_handler:
-	# li      a0, 0
-	la		t0, handle_interrupt
+	la		t0, handle_exception
 	jalr    t0
 
+interrupt_handler:
+	la		t0, handle_interrupt
+	jalr    t0
 
 
 

@@ -43,21 +43,6 @@ void (*exception_handlers[32])(void) = {
 // END(handle_\exception)
 // .endm
 
-void yay() {
-    printk("Yayayayay!\n");
-    // printk("ccccccccccccc!\n");
-    u_long r;
-    asm volatile("csrr %0, scause " : "=r"(r));
-    printk("cause=%016lx\n", r);
-    asm volatile("csrr %0, sepc " : "=r"(r));
-    printk("epc=%016lx\n", r);
-    asm volatile("csrr %0, sstatus " : "=r"(r));
-    printk("status=%016lx\n", r);
-    // asm volatile("sret");
-    schedule(1);
-    printk("dddddddddddd!\n");
-}
-
 void handle_interrupt() {
 	u_long sip;
 	asm volatile("csrr %0, sip " : "=r"(sip));
@@ -114,10 +99,18 @@ void handle_exception(u_long err) {
 			if (get_perm(&cur_pgdir, tval) & PTE_COW) {
 				
 				if (!is_mapped_page(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long))) {
+					#ifdef DEBUG
+					#if (DEBUG >= 3)
 					printk("%x: alloc uxstacktop\n", curenv->env_id);
+					#endif
+					#endif
 					alloc_page_user(&cur_pgdir, curenv->env_asid, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long), PTE_R | PTE_W | PTE_U);
 				}
+				#ifdef DEBUG
+				#if (DEBUG >= 3)
 				printk("%x: cow %016lx\n", curenv->env_id, tval);
+				#endif
+				#endif
 
 				u_long pa = get_pa(&cur_pgdir, UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long));
 				*(struct Trapframe *)(pa + sizeof(u_long)) = *tf;

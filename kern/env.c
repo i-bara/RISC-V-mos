@@ -223,7 +223,7 @@ void env_init(void) {
 	// debug_page(&base_pgdir);
 
 	u_long satp = SATP_MODE_SV39 | (base_pgdir >> 12);
-	printk("satp=%016lx\n", satp);
+	// printk("satp=%016lx\n", satp);
 
 	// u_long status;
 	// asm volatile("csrr %0, sstatus" : "=r"(status) :);
@@ -246,7 +246,7 @@ void env_init(void) {
 	// printk("%016lx!\n", *((u_long *)base_pgdir + 4));
 	asm volatile("csrw satp, %0" : : "r"(satp));
 	
-	printk("OK!\n");
+	printk("page table is good\n");
 
 	virtio_init();
 
@@ -415,14 +415,18 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
 	u_long pa = get_pa(&env->env_pgdir, va);
 	if (src != NULL) {
 		// 测试代码是否导入成功
+		#ifdef DEBUG_ELF
 		printk("from %016lx to %016lx->%016lx(%d)\n", src, (void *)(va + offset), (void *)(pa + offset), len);
+		#endif
 		memcpy((void *)(pa + offset), src, len);
+		#ifdef DEBUG_ELF
 		printk("%016lx\n", *(u_long *)pa);
 		printk("%016lx\n", ((u_long *)pa)[1]);
 		printk("%016lx\n", ((u_long *)pa)[2]);
 		printk("%016lx\n", ((u_long *)pa)[3]);
 		printk("%016lx\n", ((u_long *)pa)[4]);
 		printk("%016lx\n", ((u_long *)pa)[5]);
+		#endif
 	}
 	return 0;
 	// return page_insert(env->env_pgdir, env->env_asid, p, va, perm);
@@ -443,12 +447,16 @@ static void load_icode(struct Env *e, const void *binary, size_t size) {
 	/* Step 2: Load the segments using 'ELF_FOREACH_PHDR_OFF' and 'elf_load_seg'.
 	 * As a loader, we just care about loadable segments, so parse only program headers here.
 	 */
+	#ifdef DEBUG_ELF
 	printk("size=%d\n", size);
 	printk("binary=%016lx\n", binary);
+	#endif
 
 	size_t ph_off;
 	ELF_FOREACH_PHDR_OFF (ph_off, ehdr) {
+		#ifdef DEBUG_ELF
 		printk("elf!\n");
+		#endif
 		Elf64_Phdr *ph = (Elf64_Phdr *)(binary + ph_off);
 		if (ph->p_type == PT_LOAD) {
 			// 'elf_load_seg' is defined in lib/elfloader.c
@@ -490,7 +498,7 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
 	/* Exercise 3.7: Your code here. (3/3) */
 	load_icode(e, binary, size);
 
-	printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000));
+	// printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000)); 测试内存空间页面分配 (1/2)
 	
 	// struct Page *pp;
 	// try(page_alloc(&pp));
@@ -500,7 +508,7 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
 	// map_pages(&e->env_pgdir, e->env_asid, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X); // map 物理地址，稍后可以优化
 	TAILQ_INSERT_HEAD(&env_sched_list, e, env_sched_link);
 
-	printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000));
+	// printk("00400000->%016lx\n", get_pa(&e->env_pgdir, 0x400000)); 测试内存空间页面分配 (2/2)
 
 	return e;
 }
@@ -513,7 +521,11 @@ void env_free(struct Env *e) {
 	u_int pdeno, pteno, pa;
 
 	/* Hint: Note the environment's demise.*/
+	#ifdef DEBUG
+	#if (DEBUG >= 1)
 	printk("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	#endif
+	#endif
 
 
 	// debug_pte(&cur_pgdir, 0x80200000L);
@@ -572,7 +584,11 @@ void env_destroy(struct Env *e) {
 	/* Hint: schedule to run a new environment. */
 	if (curenv == e) {
 		curenv = NULL;
+		#ifdef DEBUG
+		#if (DEBUG >= 1)
 		printk("i am killed ... \n");
+		#endif
+		#endif
 		schedule(1);
 	}
 }
