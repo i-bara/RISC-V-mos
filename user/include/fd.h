@@ -6,7 +6,7 @@
 #define debug 0
 
 #define MAXFD 32
-#define FILEBASE 0x60000000
+#define FILEBASE 0x60000000L
 #define FDTABLE (FILEBASE - LARGE_PAGE_SIZE)
 
 #define INDEX2FD(i) (FDTABLE + (i)*BY2PG)

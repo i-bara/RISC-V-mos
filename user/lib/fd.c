@@ -32,7 +32,7 @@ int dev_lookup(int dev_id, struct Dev **dev) {
 //    return the same page at the second time.)
 //   Return 0 on success, or an error code on error.
 int fd_alloc(struct Fd **fd) {
-	u_int va;
+	u_long va;
 	u_int fdno;
 
 	for (fdno = 0; fdno < MAXFD - 1; fdno++) {
@@ -68,7 +68,7 @@ int fd_alloc(struct Fd **fd) {
 }
 
 void fd_close(struct Fd *fd) {
-	syscall_mem_unmap(0, fd);
+	syscall_mem_unmap(0, (u_long)fd);
 }
 
 // Overview:
@@ -78,7 +78,7 @@ void fd_close(struct Fd *fd) {
 //  Return 0 and set *fd to the pointer to the 'Fd' page on success.
 //  Return -E_INVAL if 'fdnum' is invalid or unmapped.
 int fd_lookup(int fdnum, struct Fd **fd) {
-	u_int va;
+	u_long va;
 
 	if (fdnum >= MAXFD) {
 		return -E_INVAL;
@@ -104,7 +104,7 @@ u_long fd2data(struct Fd *fd) {
 }
 
 int fd2num(struct Fd *fd) {
-	return ((u_int)fd - FDTABLE) / BY2PG;
+	return (int)(((u_long)fd - FDTABLE) / BY2PG);
 }
 
 int num2fd(int fd) {
@@ -154,7 +154,7 @@ int dup(int oldfdnum, int newfdnum) {
 
 			if (pte & PTE_V) {
 				// should be no error here -- pd is already allocated
-				if ((r = syscall_mem_map(0, (void *)(ova + i), 0, (void *)(nva + i),
+				if ((r = syscall_mem_map(0, ova + i, 0, nva + i,
 							 pte & (PTE_R | PTE_W | PTE_U | PTE_LIBRARY))) < 0) { // 页面标记：D 改为 RWU
 					goto err;
 				}
@@ -162,7 +162,7 @@ int dup(int oldfdnum, int newfdnum) {
 		}
 	}
 
-	if ((r = syscall_mem_map(0, oldfd, 0, newfd, pt0[(u_long)oldfd >> VPN0_SHIFT] & (PTE_R | PTE_W | PTE_U | PTE_LIBRARY))) <
+	if ((r = syscall_mem_map(0, (u_long)oldfd, 0, (u_long)newfd, pt0[(u_long)oldfd >> VPN0_SHIFT] & (PTE_R | PTE_W | PTE_U | PTE_LIBRARY))) <
 	    0) {
 		goto err;
 	}
@@ -170,10 +170,10 @@ int dup(int oldfdnum, int newfdnum) {
 	return newfdnum;
 
 err:
-	syscall_mem_unmap(0, newfd);
+	syscall_mem_unmap(0, (u_long)newfd);
 
 	for (i = 0; i < LARGE_PAGE_SIZE; i += BY2PG) {
-		syscall_mem_unmap(0, (void *)(nva + i));
+		syscall_mem_unmap(0, nva + i);
 	}
 
 	return r;
@@ -307,7 +307,7 @@ void debug_fd() {
 	debugf("[debug] fd\n");
 	debugf("no    dev     name        omode         offset    fileid    type    size    ref         \n");
 	for (u_int fdno = 0; fdno < MAXFD; fdno++) {
-		u_int va = INDEX2FD(fdno);
+		u_long va = INDEX2FD(fdno);
 
 		if ((pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V)) {
 			struct Fd *fd = (struct Fd *)va;
@@ -349,7 +349,7 @@ void debug_fd() {
 				debugf("                          ");
 			}
 
-			debugf("%-4d  %-4d  ", pageref((void *)fd), pageref((void *)fd2data(fd)));
+			debugf("%-4d  %-4d  ", pageref((u_long)fd), pageref((u_long)fd2data(fd)));
 
 			debugf("\n");
 		}

@@ -54,7 +54,7 @@ static void __attribute__((noreturn)) cow_entry(struct Trapframe *tf) {
 	/* Step 4: Copy the content of the faulting page at 'va' to 'UCOW'. */
 	/* Hint: 'va' may not be aligned to a page! */
 	/* Exercise 4.13: Your code here. (4/6) */
-	memcpy(UCOW, ROUNDDOWN(va, PAGE_SIZE), PAGE_SIZE);
+	memcpy((void *)UCOW, (void *)ROUNDDOWN(va, PAGE_SIZE), PAGE_SIZE);
 
 	// Step 5: Map the page at 'UCOW' to 'va' with the new 'perm'.
 	/* Exercise 4.13: Your code here. (5/6) */
@@ -94,14 +94,14 @@ static void __attribute__((noreturn)) cow_entry(struct Trapframe *tf) {
  *     'sys_mem_map' in kernel.
  */
 static void duppage(u_int envid, u_int vpn) {
-	int r;
-	u_int addr;
+	// int r;
+	// u_int addr;
 	u_int perm;
 
 	/* Step 1: Get the permission of the page. */
 	/* Hint: Use 'vpt' to find the page table entry. */
 	/* Exercise 4.10: Your code here. (1/2) */
-	addr = pt0[vpn] & PTE_PPN;
+	// addr = pt0[vpn] & PTE_PPN;
 	perm = pt0[vpn] & PTE_PERM;
 
 	/* Step 2: If the page is writable, and not shared with children, and not marked as COW yet,
@@ -115,7 +115,6 @@ static void duppage(u_int envid, u_int vpn) {
 	if (!(perm & PTE_U)) {
 		syscall_mem_map(0, vpn << VPN0_SHIFT, envid, vpn << VPN0_SHIFT, perm);
 	} else if ((perm & PTE_W) && !(perm & PTE_LIBRARY)) {
-		// debugf("yeah!\n");
 		syscall_mem_map(0, vpn << VPN0_SHIFT, envid, vpn << VPN0_SHIFT, (perm | PTE_COW) & ~PTE_W);
 		syscall_mem_map(0, vpn << VPN0_SHIFT, 0, vpn << VPN0_SHIFT, (perm | PTE_COW) & ~PTE_W);
 	} else {
@@ -138,11 +137,11 @@ static void duppage(u_int envid, u_int vpn) {
  */
 int fork(void) {
 	u_int child;
-	u_int i;
+	// u_int i;
 	extern volatile struct Env *env;
 
 	/* Step 1: Set our TLB Mod user exception entry to 'cow_entry' if not done yet. */
-	if (env->env_user_tlb_mod_entry != (u_int)cow_entry) {
+	if (env->env_user_tlb_mod_entry != (u_long)cow_entry) {
 		try(syscall_set_tlb_mod_entry(0, cow_entry));
 	}
 
@@ -240,7 +239,7 @@ static void _debug_page(u_long va, u_long pte) {
 	debugf("|\n");
 }
 
-void debug_page_user() {
+void user_debug_page_user() {
 	debugf("---------------------page----------------------\n");
 	for (int va = 0; va < USTACKTOP; va += PAGE_SIZE) {
 		if (pt2[va >> VPN2_SHIFT] & PTE_V) {
@@ -290,7 +289,7 @@ void debug_env() {
 	debugf("---------------------------------------env----------------------------------------\n");
 	debugf("| id        status       parent    asid      pgdir             priority  index   |\n");
 	for (int i = 0; i < NENV; i++) {
-		struct Env *e = &envs[i];
+		struct Env *e = (struct Env *)&envs[i];
 		if (e->env_id) {
 			if (e == env) {
 				debugf("|*");

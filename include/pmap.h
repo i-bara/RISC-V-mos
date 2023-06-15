@@ -84,25 +84,22 @@ void page_check(void);
 
 #define PA(pte) pte & ~0xfff;
 #define PERM(pte) pte & 0xfff;
+
 void debug_page(u_long *pgdir);
+void debug_page_user(u_long *pgdir);
 void debug_page_va(u_long *pgdir, u_long va);
+u_long debug_pte(u_long *pgdir, u_long va);
 u_long get_pa(u_long *pgdir, u_long va);
 u_long get_perm(u_long *pgdir, u_long va);
 void set_pa(u_long *pgdir, u_long va, u_long pa);
 void set_perm(u_long *pgdir, u_long va, u_long perm);
-
-int malloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm);
+int alloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm);
 int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm);
-int unmap_page(u_long *pgdir, u_int asid, u_long va);
-int is_mapped_page(u_long *pgdir, u_long va);
-
+int alloc_page_user(u_long *pgdir, u_int asid, u_long va, u_int perm);
+int map_page_user(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm);
+int unmap_page(Pde *pgdir, u_int asid, u_long va);
+int is_mapped_page(Pde *pgdir, u_long va);
+int alloc_pgdir(u_long *pgdir);
 int destroy_pgdir(u_long *pgdir, u_int asid);
-
-int create_pd(Pde **pgdir);
-int create_pt(Pde *pgdir, u_long pdx);
-int destroy_pd(Pde *pgdir, u_int asid);
-
-void set(Pde *pgdir, u_long va, u_long value);
-u_long get(Pde *pgdir, u_long va);
 
 #endif /* _PMAP_H_ */

@@ -24,9 +24,9 @@ int init_stack(u_int child, char **argv, u_int *init_sp) {
 
 	// Determine where to place the strings and the args array
 	strings = (char *)(UTEMP + BY2PG) - tot;
-	args = (u_int *)(UTEMP + BY2PG - ROUND(tot, sizeof(u_long)) - sizeof(u_long) * (argc + 1)); // 需要符合字长
+	args = (u_long *)(UTEMP + BY2PG - ROUND(tot, sizeof(u_long)) - sizeof(u_long) * (argc + 1)); // 需要符合字长
 
-	if ((r = syscall_mem_alloc(0, (void *)UTEMP, PTE_R | PTE_W | PTE_U)) < 0) {
+	if ((r = syscall_mem_alloc(0, UTEMP, PTE_R | PTE_W | PTE_U)) < 0) {
 		return r;
 	}
 
@@ -48,7 +48,7 @@ int init_stack(u_int child, char **argv, u_int *init_sp) {
 	// Initialize args[0..argc-1] to be pointers to these strings
 	// that will be valid addresses for the child environment
 	// (for whom this page will be at USTACKTOP-BY2PG!).
-	ctemp = (char *)(USTACKTOP - UTEMP - BY2PG + (u_int)strings);
+	ctemp = (char *)(USTACKTOP - UTEMP - BY2PG + (u_long)strings);
 	for (i = 0; i < argc; i++) {
 		args[i] = (u_long)ctemp; // 改成字长
 		ctemp += strlen(argv[i]) + 1;
@@ -72,33 +72,33 @@ int init_stack(u_int child, char **argv, u_int *init_sp) {
 	// Set *init_sp to the initial stack pointer for the child
 	*init_sp = USTACKTOP - UTEMP - BY2PG + (u_long)argc_ptr; // 改成字长
 
-	if ((r = syscall_mem_map(0, (void *)UTEMP, child, (void *)(USTACKTOP - BY2PG), PTE_R | PTE_W | PTE_U)) <
+	if ((r = syscall_mem_map(0, UTEMP, child, USTACKTOP - BY2PG, PTE_R | PTE_W | PTE_U)) <
 	    0) {
 		goto error;
 	}
-	if ((r = syscall_mem_unmap(0, (void *)UTEMP)) < 0) {
+	if ((r = syscall_mem_unmap(0, UTEMP)) < 0) {
 		goto error;
 	}
 
 	return 0;
 
 error:
-	syscall_mem_unmap(0, (void *)UTEMP);
+	syscall_mem_unmap(0, UTEMP);
 	return r;
 }
 
 static int spawn_mapper(void *data, u_long va, size_t offset, u_int perm, const void *src,
 			size_t len) {
 	u_int child_id = *(u_int *)data;
-	try(syscall_mem_alloc(child_id, (void *)va, perm));
+	try(syscall_mem_alloc(child_id, va, perm));
 	if (src != NULL) {
-		int r = syscall_mem_map(child_id, (void *)va, 0, (void *)UTEMP, perm | PTE_R | PTE_W | PTE_U);
+		int r = syscall_mem_map(child_id, va, 0, UTEMP, perm | PTE_R | PTE_W | PTE_U);
 		if (r) {
-			syscall_mem_unmap(child_id, (void *)va);
+			syscall_mem_unmap(child_id, va);
 			return r;
 		}
 		memcpy((void *)(UTEMP + offset), src, len);
-		return syscall_mem_unmap(0, (void *)UTEMP);
+		return syscall_mem_unmap(0, UTEMP);
 	}
 	return 0;
 }

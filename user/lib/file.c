@@ -44,11 +44,11 @@ int open(const char *path, int mode) {
 
 	// Step 3: Set 'va' to the address of the page where the 'fd''s data is cached, using
 	// 'fd2data'. Set 'size' and 'fileid' correctly with the value in 'fd' as a 'Filefd'.
-	char *va;
+	u_long va;
 	struct Filefd *ffd;
 	u_int size, fileid;
 	/* Exercise 5.9: Your code here. (3/5) */
-	va = (char *)fd2data(fd);
+	va = fd2data(fd);
 	ffd = (struct Filefd *)fd;
 	size = ffd->f_file.f_size;
 	fileid = ffd->f_fileid;
@@ -56,7 +56,7 @@ int open(const char *path, int mode) {
 	// Step 4: Alloc pages and map the file content using 'fsipc_map'.
 	for (int i = 0; i < size; i += BY2PG) {
 		/* Exercise 5.9: Your code here. (4/5) */
-		if ((r = fsipc_map(fileid, i, (void *)(va + i))) < 0) {
+		if ((r = fsipc_map(fileid, i, va + i)) < 0) {
 			return r;
 		}
 
@@ -73,7 +73,7 @@ int open(const char *path, int mode) {
 int file_close(struct Fd *fd) {
 	int r;
 	struct Filefd *ffd;
-	void *va;
+	u_long va;
 	u_int size, fileid;
 	u_int i;
 
@@ -100,7 +100,7 @@ int file_close(struct Fd *fd) {
 		return 0;
 	}
 	for (i = 0; i < size; i += BY2PG) {
-		if ((r = syscall_mem_unmap(0, (void *)(va + i))) < 0) {
+		if ((r = syscall_mem_unmap(0, va + i)) < 0) {
 			debugf("cannont unmap the file.\n");
 			return r;
 		}
@@ -230,7 +230,7 @@ int ftruncate(int fdnum, u_int size) {
 		return r;
 	}
 
-	void *va = fd2data(fd);
+	u_long va = fd2data(fd);
 
 	// Map any new pages needed if extending the file
 	for (i = ROUND(oldsize, BY2PG); i < ROUND(size, BY2PG); i += BY2PG) {
@@ -242,7 +242,7 @@ int ftruncate(int fdnum, u_int size) {
 
 	// Unmap pages if truncating the file
 	for (i = ROUND(size, BY2PG); i < ROUND(oldsize, BY2PG); i += BY2PG) {
-		if ((r = syscall_mem_unmap(0, (void *)(va + i))) < 0) {
+		if ((r = syscall_mem_unmap(0, va + i)) < 0) {
 			user_panic("ftruncate: syscall_mem_unmap %08x: %e", va + i, r);
 		}
 	}

@@ -11,9 +11,9 @@ int block_is_free(u_int);
 // Overview:
 //  Return the virtual address of this disk block in cache.
 // Hint: Use 'DISKMAP' and 'BY2BLK' to calculate the address.
-void *diskaddr(u_int blockno) {
+u_long diskaddr(u_int blockno) {
 	/* Exercise 5.6: Your code here. */
-	return (void *)(DISKMAP + (blockno * BY2BLK));
+	return (u_long)(DISKMAP + (blockno * BY2BLK));
 
 }
 
@@ -26,12 +26,12 @@ int va_is_mapped(u_long va) {
 // Overview:
 //  Check if this disk block is mapped in cache.
 //  Returns the virtual address of the cache page if mapped, 0 otherwise.
-void *block_is_mapped(u_int blockno) {
-	void *va = diskaddr(blockno);
+u_long block_is_mapped(u_int blockno) {
+	u_long va = diskaddr(blockno);
 	if (va_is_mapped(va)) {
 		return va;
 	}
-	return NULL;
+	return 0;
 }
 
 // Overview:
@@ -50,7 +50,7 @@ int block_is_dirty(u_int blockno) {
 // Overview:
 //  Mark this block as dirty (cache page has changed and needs to be written back to disk).
 int dirty_block(u_int blockno) {
-	void *va = diskaddr(blockno);
+	u_long va = diskaddr(blockno);
 
 	if (!va_is_mapped(va)) {
 		return -E_NOT_FOUND;
@@ -72,7 +72,7 @@ void write_block(u_int blockno) {
 	}
 
 	// Step2: write data to IDE disk. (using ide_write, and the diskno is 0)
-	void *va = diskaddr(blockno);
+	u_long va = diskaddr(blockno);
 	ide_write(0, blockno * SECT2BLK, va, SECT2BLK);
 	// debugf("[ide] Write: %08x->%d(%08x)\n", va, 0, blockno * BY2BLK);
 }
@@ -108,7 +108,7 @@ int read_block(u_int blockno, void **blk, u_int *isnew) {
 	}
 
 	// Step 3: transform block number to corresponding virtual address.
-	void *va = diskaddr(blockno);
+	u_long va = diskaddr(blockno);
 
 	// Step 4: read disk and set *isnew.
 	// Hint:
@@ -136,7 +136,7 @@ int read_block(u_int blockno, void **blk, u_int *isnew) {
 
 	// Step 5: if blk != NULL, assign 'va' to '*blk'.
 	if (blk) {
-		*blk = va;
+		*blk = (void *)va;
 	}
 	return 0;
 }
@@ -154,7 +154,7 @@ int map_block(u_int blockno) {
 	// Step 2: Alloc a page in permission 'PTE_D' via syscall.
 	// Hint: Use 'diskaddr' for the virtual address.
 	/* Exercise 5.7: Your code here. (2/5) */
-	void *va = diskaddr(blockno);
+	u_long va = diskaddr(blockno);
 	return syscall_mem_alloc(0, va, PTE_R | PTE_W | PTE_U); // 页面标记
 
 }
@@ -163,7 +163,7 @@ int map_block(u_int blockno) {
 //  Unmap a disk block in cache.
 void unmap_block(u_int blockno) {
 	// Step 1: Get the mapped address of the cache page of this block using 'block_is_mapped'.
-	void *va;
+	u_long va;
 	/* Exercise 5.7: Your code here. (3/5) */
 	va = block_is_mapped(blockno);
 
@@ -303,7 +303,7 @@ void read_bitmap(void) {
 		read_block(i + 2, blk, 0);
 	}
 
-	bitmap = diskaddr(2);
+	bitmap = (uint32_t *)diskaddr(2);
 
 	// Step 2: Make sure the reserved and root blocks are marked in-use.
 	// Hint: use `block_is_free`
@@ -839,7 +839,7 @@ int alloc_block1(void) {
 			if (block_is_mapped(bno)) {
 				return bno;
 			}
-			void *va = diskaddr(bno);
+			u_long va = diskaddr(bno);
 			if ((r = syscall_mem_alloc(0, va, PTE_R | PTE_W | PTE_U)) < 0) { // 页面标记
 				bitmap[bno / 32] |= (1 << (bno % 32));
 				return r;

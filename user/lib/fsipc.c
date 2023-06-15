@@ -22,8 +22,8 @@ u_char fsipcbuf[BY2PG] __attribute__((aligned(BY2PG)));
 static int fsipc(u_int type, void *fsreq, void *dstva, u_int *perm) {
 	u_int whom;
 	// Our file system server must be the 2nd env.
-	ipc_send(envs[1].env_id, type, fsreq, PTE_R | PTE_W | PTE_U);
-	return ipc_recv(&whom, dstva, perm);
+	ipc_send(envs[1].env_id, type, (u_long)fsreq, PTE_R | PTE_W | PTE_U);
+	return ipc_recv(&whom, (u_long)dstva, perm);
 }
 
 // Overview:
@@ -57,7 +57,7 @@ int fsipc_open(const char *path, u_int omode, struct Fd *fd) {
 // Returns:
 //  0 on success,
 //  < 0 on failure.
-int fsipc_map(u_int fileid, u_int offset, void *dstva) {
+int fsipc_map(u_int fileid, u_int offset, u_long dstva) {
 	int r;
 	u_int perm;
 	struct Fsreq_map *req;
@@ -66,7 +66,7 @@ int fsipc_map(u_int fileid, u_int offset, void *dstva) {
 	req->req_fileid = fileid;
 	req->req_offset = offset;
 
-	if ((r = fsipc(FSREQ_MAP, req, dstva, &perm)) < 0) {
+	if ((r = fsipc(FSREQ_MAP, req, (void *)dstva, &perm)) < 0) {
 		return r;
 	}
 

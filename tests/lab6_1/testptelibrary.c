@@ -1,6 +1,6 @@
 #include <lib.h>
 
-#define TMPVA ((char *)0x50005000)
+#define TMPVA 0x50005000
 const char *msg = "hello world!\n";
 const char *msg2 = "goodbye ,world!\n";
 
@@ -19,13 +19,13 @@ int main(int argc, char **argv) {
 		user_panic("fork: %d", r);
 	}
 	if (r == 0) {
-		strcpy(TMPVA, msg);
+		strcpy((char *)TMPVA, msg);
 		exit();
 	}
 
 	wait(r);
 	debugf("TMPVAis  %s \n", TMPVA);
-	if (strcmp(TMPVA, msg) == 0) {
+	if (strcmp((char *)TMPVA, msg) == 0) {
 		debugf("fork solved the problem of PTE_LIBRARY,congratulations!\n");
 	} else {
 		user_panic("sorry , your fork may be wrong\n");
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 	}
 	debugf("child = %x\n", r);
 	wait(r);
-	if (strcmp(TMPVA, msg2) == 0) {
+	if (strcmp((char *)TMPVA, msg2) == 0) {
 		debugf("spawn solved the problem of PTE_LIBRARY,congratulations!\n");
 	} else {
 		user_panic("sorry , your spawn may be wrong\n");
@@ -45,6 +45,6 @@ int main(int argc, char **argv) {
 }
 
 void childofspawn(void) {
-	strcpy(TMPVA, msg2);
+	strcpy((char *)TMPVA, msg2);
 	exit();
 }

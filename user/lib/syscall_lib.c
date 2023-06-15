@@ -28,15 +28,15 @@ int syscall_set_tlb_mod_entry(u_int envid, void (*func)(struct Trapframe *)) {
 	return msyscall(SYS_set_tlb_mod_entry, envid, func);
 }
 
-int syscall_mem_alloc(u_int envid, void *va, u_int perm) {
+int syscall_mem_alloc(u_int envid, u_long va, u_int perm) {
 	return msyscall(SYS_mem_alloc, envid, va, perm);
 }
 
-int syscall_mem_map(u_int srcid, void *srcva, u_int dstid, void *dstva, u_int perm) {
+int syscall_mem_map(u_int srcid, u_long srcva, u_int dstid, u_long dstva, u_int perm) {
 	return msyscall(SYS_mem_map, srcid, srcva, dstid, dstva, perm);
 }
 
-int syscall_mem_unmap(u_int envid, void *va) {
+int syscall_mem_unmap(u_int envid, u_long va) {
 	return msyscall(SYS_mem_unmap, envid, va);
 }
 
@@ -53,11 +53,11 @@ void syscall_panic(const char *msg) {
 	user_panic("SYS_panic returned %d", r);
 }
 
-int syscall_ipc_try_send(u_int envid, u_int value, const void *srcva, u_int perm) {
+int syscall_ipc_try_send(u_int envid, u_int value, const u_long srcva, u_int perm) {
 	return msyscall(SYS_ipc_try_send, envid, value, srcva, perm);
 }
 
-int syscall_ipc_recv(void *dstva) {
+int syscall_ipc_recv(u_long dstva) {
 	return msyscall(SYS_ipc_recv, dstva);
 }
 

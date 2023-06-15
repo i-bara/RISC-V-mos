@@ -18,8 +18,8 @@
 #define DISKMAX 0x40000000
 
 /* ide.c */
-void ide_read(u_int diskno, u_int secno, void *dst, u_int nsecs);
-void ide_write(u_int diskno, u_int secno, void *src, u_int nsecs);
+void ide_read(u_int diskno, u_int secno, u_long dst, u_int nsecs);
+void ide_write(u_int diskno, u_int secno, u_long src, u_int nsecs);
 
 /* fs.c */
 int file_open(char *path, struct File **pfile);

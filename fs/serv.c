@@ -24,13 +24,13 @@ struct Open {
 struct Open opentab[MAXOPEN] = {{0, 0, 1}};
 
 // Virtual address at which to receive page mappings containing client requests.
-#define REQVA 0x0ffff000
+#define REQVA 0x0ffff000L
 
 // Overview:
 //  Initialize file system server process.
 void serve_init(void) {
 	int i;
-	u_int va;
+	u_long va;
 
 	// Set virtual address to map.
 	va = FILEVA;
@@ -50,9 +50,9 @@ int open_alloc(struct Open **o) {
 
 	// Find an available open-file table entry
 	for (i = 0; i < MAXOPEN; i++) {
-		switch (pageref(opentab[i].o_ff)) {
+		switch (pageref((u_long)opentab[i].o_ff)) {
 		case 0:
-			if ((r = syscall_mem_alloc(0, opentab[i].o_ff, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) { // 修改页面标记
+			if ((r = syscall_mem_alloc(0, (u_long)opentab[i].o_ff, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) { // 修改页面标记
 				return r;
 			}
 		case 1:
@@ -73,7 +73,7 @@ int open_lookup(u_int envid, u_int fileid, struct Open **po) {
 
 	o = &opentab[fileid % MAXOPEN];
 
-	if (pageref(o->o_ff) == 1 || o->o_fileid != fileid) {
+	if (pageref((u_long)o->o_ff) == 1 || o->o_fileid != fileid) {
 		return -E_INVAL;
 	}
 
@@ -113,7 +113,7 @@ void serve_open(u_int envid, struct Fsreq_open *rq) {
 	ff->f_fd.fd_omode = o->o_mode;
 	ff->f_fd.fd_dev_id = devfile.dev_id;
 
-	ipc_send(envid, 0, o->o_ff, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 修改页面标记
+	ipc_send(envid, 0, (u_long)o->o_ff, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 修改页面标记
 }
 
 void serve_map(u_int envid, struct Fsreq_map *rq) {
@@ -134,7 +134,7 @@ void serve_map(u_int envid, struct Fsreq_map *rq) {
 		return;
 	}
 
-	ipc_send(envid, 0, blk, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 修改页面标记
+	ipc_send(envid, 0, (u_long)blk, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 修改页面标记
 }
 
 void serve_set_size(u_int envid, struct Fsreq_set_size *rq) {
@@ -219,7 +219,7 @@ void serve(void) {
 	for (;;) {
 		perm = 0;
 
-		req = ipc_recv(&whom, (void *)REQVA, &perm);
+		req = ipc_recv(&whom, REQVA, &perm);
 
 		// All requests must contain an argument page
 		if (!(perm & PTE_V)) {
@@ -269,7 +269,7 @@ void serve(void) {
 			break;
 		}
 
-		syscall_mem_unmap(0, (void *)REQVA);
+		syscall_mem_unmap(0, REQVA);
 	}
 }
 
@@ -289,7 +289,7 @@ void debug_open() {
 	debugf("[debug] open\n");
 	debugf("no    name        omode         offset    fileid    type    size    \n");
 	for (int i = 0; i < MAXOPEN; i++) {
-		if ((pageref(opentab[i].o_ff) > 1)) {
+		if ((pageref((u_long)opentab[i].o_ff) > 1)) {
 			debugf("%-4d  ", i);
 			debugf("%-10s  ", opentab[i].o_file->f_name);
 

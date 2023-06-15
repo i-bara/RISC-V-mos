@@ -6,6 +6,8 @@
 #include <pmap.h>
 #include <printk.h>
 #include <trap.h>
+#include <sched.h>
+#include <syscall.h>
 
 extern void handle_int(void);
 extern void handle_tlb(void);
@@ -50,7 +52,7 @@ void handle_interrupt() {
 		schedule(0);
 	}
 	printk("sip=%016lx\n", sip);
-	halt;
+	halt();
 }
 
 void handle_exception(u_long err) {

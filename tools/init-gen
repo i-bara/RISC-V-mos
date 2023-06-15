@@ -32,6 +32,7 @@ echo 'void mips_init() {
 
 	
 	int r = sbi_set_timer(10000000);
+	assert(r == 0);
 	asm volatile("csrs sie, %0" : : "r"(SIE_STIE));
 	asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
 

@@ -86,7 +86,3 @@ void schedule(int yield) {
 	env_run(e);
 
 }
-
-void ba(int yield) {
-	printk("kkkkkkkkkk ba ba\n");
-}

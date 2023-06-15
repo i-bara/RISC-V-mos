@@ -25,12 +25,12 @@
 // Hint: Use the physical address and offsets defined in 'include/drivers/dev_disk.h':
 //  'DEV_DISK_ADDRESS', 'DEV_DISK_ID', 'DEV_DISK_OFFSET', 'DEV_DISK_OPERATION_READ',
 //  'DEV_DISK_START_OPERATION', 'DEV_DISK_STATUS', 'DEV_DISK_BUFFER'
-void ide_read(u_int diskno, u_int secno, void *dst, u_int nsecs) {
+void ide_read(u_int diskno, u_int secno, u_long dst, u_int nsecs) {
 	// if ((u_long)dst % BY2SECT != 0) {
 	// 	user_panic("Read dst not aligned");
 	// }
 	for (u_int i = 0; i < nsecs; i++) {
-		syscall_read_sector((u_long)dst + i * BY2SECT, secno + i);
+		syscall_read_sector(dst + i * BY2SECT, secno + i);
 	}
 
 	// u_int begin = secno * BY2SECT;
@@ -72,12 +72,12 @@ void ide_read(u_int diskno, u_int secno, void *dst, u_int nsecs) {
 // Hint: Use the physical address and offsets defined in 'include/drivers/dev_disk.h':
 //  'DEV_DISK_ADDRESS', 'DEV_DISK_ID', 'DEV_DISK_OFFSET', 'DEV_DISK_BUFFER',
 //  'DEV_DISK_OPERATION_WRITE', 'DEV_DISK_START_OPERATION', 'DEV_DISK_STATUS'
-void ide_write(u_int diskno, u_int secno, void *src, u_int nsecs) {
+void ide_write(u_int diskno, u_int secno, u_long src, u_int nsecs) {
 	// if ((u_long)src % BY2SECT != 0) {
 	// 	user_panic("Write src not aligned");
 	// }
 	for (u_int i = 0; i < nsecs; i++) {
-		syscall_write_sector((u_long)src + i * BY2SECT, secno + i);
+		syscall_write_sector(src + i * BY2SECT, secno + i);
 	}
 
 	// u_int begin = secno * BY2SECT;

@@ -54,9 +54,9 @@ u_int syscall_getenvid(void);
 void syscall_yield(void);
 int syscall_env_destroy(u_int envid);
 int syscall_set_tlb_mod_entry(u_int envid, void (*func)(struct Trapframe *));
-int syscall_mem_alloc(u_int envid, void *va, u_int perm);
-int syscall_mem_map(u_int srcid, void *srcva, u_int dstid, void *dstva, u_int perm);
-int syscall_mem_unmap(u_int envid, void *va);
+int syscall_mem_alloc(u_int envid, u_long va, u_int perm);
+int syscall_mem_map(u_int srcid, u_long srcva, u_int dstid, u_long dstva, u_int perm);
+int syscall_mem_unmap(u_int envid, u_long va);
 
 __attribute__((always_inline)) inline static int syscall_exofork(void) {
 	return msyscall(SYS_exofork, 0, 0, 0, 0, 0);
@@ -65,15 +65,18 @@ __attribute__((always_inline)) inline static int syscall_exofork(void) {
 int syscall_set_env_status(u_int envid, u_int status);
 int syscall_set_trapframe(u_int envid, struct Trapframe *tf);
 void syscall_panic(const char *msg) __attribute__((noreturn));
-int syscall_ipc_try_send(u_int envid, u_int value, const void *srcva, u_int perm);
-int syscall_ipc_recv(void *dstva);
+int syscall_ipc_try_send(u_int envid, u_int value, const u_long srcva, u_int perm);
+int syscall_ipc_recv(u_long dstva);
 int syscall_cgetc();
 int syscall_write_dev(void *, u_int, u_int);
 int syscall_read_dev(void *, u_int, u_int);
+int syscall_read_sector(u_long, le64);
+int syscall_write_sector(u_long, le64);
+int syscall_flush();
 
 // ipc.c
-void ipc_send(u_int whom, u_int val, const void *srcva, u_int perm);
-u_int ipc_recv(u_int *whom, void *dstva, u_int *perm);
+void ipc_send(u_int whom, u_int val, const u_long srcva, u_int perm);
+u_int ipc_recv(u_int *whom, u_long dstva, u_int *perm);
 
 // wait.c
 void wait(u_int envid);
@@ -95,7 +98,7 @@ int printf(const char *fmt, ...);
 
 // fsipc.c
 int fsipc_open(const char *, u_int, struct Fd *);
-int fsipc_map(u_int, u_int, void *);
+int fsipc_map(u_int, u_int, u_long);
 int fsipc_set_size(u_int, u_int);
 int fsipc_close(u_int);
 int fsipc_dirty(u_int, u_int);

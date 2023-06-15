@@ -35,24 +35,24 @@ struct Pipe {
  */
 int pipe(int pfd[2]) {
 	int r;
-	void *va;
+	u_long va;
 	struct Fd *fd0, *fd1;
 
 	/* Step 1: Allocate the file descriptors. */
-	if ((r = fd_alloc(&fd0)) < 0 || (r = syscall_mem_alloc(0, fd0, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
+	if ((r = fd_alloc(&fd0)) < 0 || (r = syscall_mem_alloc(0, (u_long)fd0, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err;
 	}
 
-	if ((r = fd_alloc(&fd1)) < 0 || (r = syscall_mem_alloc(0, fd1, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
+	if ((r = fd_alloc(&fd1)) < 0 || (r = syscall_mem_alloc(0, (u_long)fd1, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err1;
 	}
 
 	/* Step 2: Allocate and map the page for the 'Pipe' structure. */
 	va = fd2data(fd0);
-	if ((r = syscall_mem_alloc(0, (void *)va, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
+	if ((r = syscall_mem_alloc(0, (u_long)va, PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) < 0) {
 		goto err2;
 	}
-	if ((r = syscall_mem_map(0, (void *)va, 0, (void *)fd2data(fd1), PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) <
+	if ((r = syscall_mem_map(0, (u_long)va, 0, (u_long)fd2data(fd1), PTE_R | PTE_W | PTE_U | PTE_LIBRARY)) <
 	    0) {
 		goto err3;
 	}
@@ -72,11 +72,11 @@ int pipe(int pfd[2]) {
 	return 0;
 
 err3:
-	syscall_mem_unmap(0, (void *)va);
+	syscall_mem_unmap(0, (u_long)va);
 err2:
-	syscall_mem_unmap(0, fd1);
+	syscall_mem_unmap(0, (u_long)fd1);
 err1:
-	syscall_mem_unmap(0, fd0);
+	syscall_mem_unmap(0, (u_long)fd0);
 err:
 	return r;
 }
@@ -108,28 +108,21 @@ static volatile int _pipe_is_closed(struct Fd *fd, struct Pipe *p) {
 	// reading the reference counts.
 	/* Exercise 6.1: Your code here. (1/3) */
 	runs = env->env_runs;
-	fd_ref = pageref((void *)fd);
-	pipe_ref = pageref((void *)p);
+	fd_ref = pageref((u_long)fd);
+	pipe_ref = pageref((u_long)p);
 
 	// debugf("%d -> %d\n", runs, env->env_runs);
 
 	while (runs != env->env_runs) {
 		runs = env->env_runs;
-		fd_ref = pageref((void *)fd);
-		pipe_ref = pageref((void *)p);
+		fd_ref = pageref((u_long)fd);
+		pipe_ref = pageref((u_long)p);
 		// debugf("[%08x] %d -> %d   runs=%d    in\n", env->env_id, fd_ref, pipe_ref, runs);
 	}
 
 	// debugf("[%08x] %d -> %d   runs=%d %d\n", env->env_id, fd_ref, pipe_ref, runs, env->env_runs);
 
 	return fd_ref == pipe_ref;
-}
-
-static int next(int pos) {
-	if (++pos == BY2PIPE) {
-		return 0;
-	}
-	return pos;
 }
 
 /* Overview:
@@ -158,7 +151,7 @@ static int pipe_read(struct Fd *fd, void *vbuf, u_int n, u_int offset) {
 	//    of bytes read so far.
 	//  - Otherwise, keep yielding until the buffer isn't empty or the pipe is closed.
 	/* Exercise 6.1: Your code here. (2/3) */
-	p = fd2data(fd);
+	p = (struct Pipe *)fd2data(fd);
 	rbuf = (char *)vbuf;
 	for (i = 0; i < n; i++) {
 		while (p->p_wpos == p->p_rpos) { // empty
@@ -204,10 +197,10 @@ static int pipe_write(struct Fd *fd, const void *vbuf, u_int n, u_int offset) {
 	//  - If the pipe isn't closed, keep yielding until the buffer isn't full or the
 	//    pipe is closed.
 	/* Exercise 6.1: Your code here. (3/3) */
-	p = fd2data(fd);
+	p = (struct Pipe *)fd2data(fd);
 	wbuf = (char *)vbuf;
 	for (i = 0; i < n; i++) {
-		while (p->p_wpos + 1 == p->p_rpos || p->p_wpos == BY2PIPE - 1 && p->p_rpos == 0) { // full
+		while ((p->p_wpos + 1 == p->p_rpos) || (p->p_wpos == BY2PIPE - 1 && p->p_rpos == 0)) { // full
 			if (_pipe_is_closed(fd, p)) {
 				return i;
 			} else {
@@ -264,8 +257,8 @@ int pipe_is_closed(int fdnum) {
  */
 static int pipe_close(struct Fd *fd) {
 	// Unmap 'fd' and the referred Pipe.
-	syscall_mem_unmap(0, fd);
-	syscall_mem_unmap(0, (void *)fd2data(fd));
+	syscall_mem_unmap(0, (u_long)fd);
+	syscall_mem_unmap(0, (u_long)fd2data(fd));
 	return 0;
 }
 

@@ -174,7 +174,7 @@ static inline int is_illegal_va_range(u_long va, u_long len) {
 int sys_mem_alloc(u_long envid, u_long va, u_long perm) {
 
 	struct Env *env;
-	struct Page *pp;
+	// struct Page *pp;
 
 	/* Step 1: Check if 'va' is a legal user virtual address using 'is_illegal_va'. */
 	/* Exercise 4.4: Your code here. (1/3) */
@@ -214,7 +214,7 @@ int sys_mem_alloc(u_long envid, u_long va, u_long perm) {
 int sys_mem_map(u_long srcid, u_long srcva, u_long dstid, u_long dstva, u_long perm) {
 	struct Env *srcenv;
 	struct Env *dstenv;
-	struct Page *pp;
+	// struct Page *pp;
 
 	/* Step 1: Check if 'srcva' and 'dstva' are legal user virtual addresses using
 	 * 'is_illegal_va'. */
@@ -490,7 +490,7 @@ int sys_ipc_recv(u_long dstva) {
  */
 int sys_ipc_try_send(u_long envid, u_long value, u_long srcva, u_long perm) {
 	struct Env *e;
-	struct Page *p;
+	// struct Page *p;
 
 	/* Step 1: Check if 'srcva' is either zero or a legal address. */
 	/* Exercise 4.8: Your code here. (4/8) */

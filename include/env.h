@@ -6,6 +6,7 @@
 #include <trap.h>
 #include <types.h>
 #include <virtio.h>
+#include <sbi.h>
 
 #define LOG2NENV 10
 #define NENV (1 << LOG2NENV)

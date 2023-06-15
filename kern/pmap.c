@@ -682,6 +682,7 @@ u_long debug_pte(u_long *pgdir, u_long va) {
 	} else {
 		printk("invalid\n");
 	}
+	return -1;
 }
 
 u_long get_pa(u_long *pgdir, u_long va) {
@@ -714,7 +715,7 @@ u_long get_pa(u_long *pgdir, u_long va) {
 			u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 			if (*pte0 & PTE_V) {
-				return PTE2PA(*pte0) | va & PTE_OFFSET;
+				return PTE2PA(*pte0) | (va & PTE_OFFSET);
 
 			} else {
 				return -1;
@@ -1244,6 +1245,7 @@ int alloc_pgdir(u_long *pgdir) {
 	try(page_alloc(&p));
 	p->pp_ref++;
 	*pgdir = page2pa(p);
+	return 0;
 }
 
 int destroy_pgdir(u_long *pgdir, u_int asid) {
@@ -1265,7 +1267,6 @@ int destroy_pgdir(u_long *pgdir, u_int asid) {
 							if (*pte0 & PTE_V) {
 								u_long va = vpn2 << VPN2_SHIFT | vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
 								u_long pa = PTE2PA(*pte0);
-								u_long perm = *pte0 & PTE_PERM;
 
 								// clear
 								if (--pa2page(pa)->pp_ref == 0) {

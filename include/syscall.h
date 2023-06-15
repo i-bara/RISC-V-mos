@@ -30,4 +30,6 @@ enum {
 
 #endif
 
+void do_syscall(struct Trapframe *tf);
+
 #endif

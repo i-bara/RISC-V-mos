@@ -20,8 +20,8 @@ struct Env_sched_list env_sched_list; // Runnable list
 
 u_long base_pgdir;
 
-static u_long delta_time = 30000L;
-static u_long time = 20000000L;
+static uint64_t delta_time = 30000L;
+static uint64_t time = 20000000L;
 
 static uint32_t asid_bitmap[NASID / 32] = {0}; // 64
 
@@ -192,9 +192,9 @@ void env_init(void) {
 	p->pp_ref++;
 
 	base_pgdir = 0;
-	map_pages(&base_pgdir, 0, pages, PAGES, ROUND(npage * sizeof(struct Page), PAGE_SIZE),
+	map_pages(&base_pgdir, 0, (u_long)pages, PAGES, ROUND(npage * sizeof(struct Page), PAGE_SIZE),
 		    PTE_R | PTE_G | PTE_U);
-	map_pages(&base_pgdir, 0, envs, ENVS, ROUND(NENV * sizeof(struct Env), PAGE_SIZE),
+	map_pages(&base_pgdir, 0, (u_long)envs, ENVS, ROUND(NENV * sizeof(struct Env), PAGE_SIZE),
 		    PTE_R | PTE_G | PTE_U);
 	map_pages(&base_pgdir, 0, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X);
 	map_pages(&base_pgdir, 0, 0x10001000, 0xb0001000, 0x0000000000008000, PTE_R | PTE_W | PTE_X);
@@ -326,7 +326,7 @@ static int env_setup_vm(struct Env *e) {
  *     'env_user_tlb_mod_entry', 'env_runs'
  */
 int env_alloc(struct Env **new, u_int parent_id) {
-	int r;
+	// int r;
 	struct Env *e;
 
 	/* Step 1: Get a free Env from 'env_free_list' */
@@ -388,8 +388,8 @@ int env_alloc(struct Env **new, u_int parent_id) {
 static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, const void *src,
 			     size_t len) {
 	struct Env *env = (struct Env *)data;
-	struct Page *p;
-	int r;
+	// struct Page *p;
+	// int r;
 
 	/* Step 1: Allocate a page with 'page_alloc'. */
 	/* Exercise 3.5: Your code here. (1/2) */
@@ -517,8 +517,8 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
  *  Free env e and all memory it uses.
  */
 void env_free(struct Env *e) {
-	Pte *pt;
-	u_int pdeno, pteno, pa;
+	// Pte *pt;
+	// u_int pdeno, pteno, pa;
 
 	/* Hint: Note the environment's demise.*/
 	#ifdef DEBUG
@@ -691,7 +691,7 @@ void env_run(struct Env *e) {
 
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！不知道为什么摧毁摧毁后切换的下一个进程没有内核映射
 
-	asm volatile("csrw satp, %0" : : "r"(SATP_MODE_SV39 & SATP_MODE | ((u_long)e->env_asid << 44) & SATP_ASID | (e->env_pgdir >> 12) & SATP_PPN));
+	asm volatile("csrw satp, %0" : : "r"((SATP_MODE_SV39 & SATP_MODE) | (((u_long)e->env_asid << 44) & SATP_ASID) | ((e->env_pgdir >> 12) & SATP_PPN)));
 	asm volatile("sfence.vma x0, x0");
 	
 	// 一种简单的自映射方法，但是在 RISC-V 下不可以这样，因为这样无法访问页表，因为缺少 PTE_R
@@ -719,7 +719,7 @@ void env_run(struct Env *e) {
 	// printk("%016lx\n", ((u_long *)pa)[5]);
 
 	extern char exc_gen_entry[];
-	e->env_tf.stvec = exc_gen_entry; // 啊啊啊忘记加异常返回地址了，怪不得总是 sret 就卡住了
+	e->env_tf.stvec = (u_long)exc_gen_entry; // 啊啊啊忘记加异常返回地址了，怪不得总是 sret 就卡住了
 
 	// printk("yield!\n");
 	// debug_env();
@@ -730,7 +730,9 @@ void env_run(struct Env *e) {
 	// halt();
 	// printk("%016lx\n", PTE2PA(((u_long *)PAGE_TABLE)[0x400]));
 
+
 	int r = sbi_set_timer(time); // 时间不能太短，如果 10000000L 就会立刻中断
+	assert(r == 0);
 	time += delta_time;
 	// printk("timer=%d\n", r);
 
@@ -763,6 +765,9 @@ void env_run(struct Env *e) {
 	// asm volatile("csrs sstatus, %0" : : "r"(SSTATUS_SIE));
 	asm volatile("add sp, %0, zero" : : "r"(&e->env_tf));
 	asm volatile("j ret_from_exception");
+
+	panic("Reach env_run end");
+	while (1);
 }
 
 void env_check() {

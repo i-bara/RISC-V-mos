@@ -2,7 +2,7 @@
 
 int main() {
 	int p[2], r, pid, i, max;
-	void *va;
+	u_long va;
 	struct Fd *fd;
 	volatile struct Env *kid;
 
@@ -62,7 +62,7 @@ int main() {
 		user_panic("cannot look up p[0]: %d", r);
 	}
 	va = fd2data(fd);
-	if (pageref((void *)va) != 3 + 1) {
+	if (pageref(va) != 3 + 1) {
 		debugf("\nchild detected race\n");
 	} else {
 		debugf("\nrace didn't happen\n", max);
