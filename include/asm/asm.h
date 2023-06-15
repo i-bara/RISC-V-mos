@@ -1,6 +1,11 @@
 #include <asm/csrdef.h>
 #include <asm/regdef.h>
-#include <asm/sv39.h>
+
+#ifdef RISCV32
+	#include <asm/sv32.h>
+#else
+	#include <asm/sv39.h>
+#endif
 
 /*
  * LEAF - declare leaf routine

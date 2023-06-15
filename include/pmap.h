@@ -1,7 +1,6 @@
 #ifndef _PMAP_H_
 #define _PMAP_H_
 
-#include <asm/sv39.h>
 #include <mmu.h>
 #include <printk.h>
 #include <queue.h>

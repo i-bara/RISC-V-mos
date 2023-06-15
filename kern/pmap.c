@@ -1,6 +1,5 @@
 #include <drivers/dev_mp.h>
 #include <env.h>
-#include <asm/sv39.h>
 #include <mmu.h>
 #include <pmap.h>
 #include <printk.h>
@@ -1139,7 +1138,7 @@ create_pte0:
 	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
 	// debug_page(pgdir);
 	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> 9), get_pa(pgdir, PAGE_TABLE + (va >> 9)));
-
+	
 map:
 	tlb_invalidate(asid, va);
 	*pte0 = PA2PTE(pa) | perm | PTE_V;

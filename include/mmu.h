@@ -3,7 +3,7 @@
 
 #include <error.h>
 #include <memory.h>
-#include <asm/sv39.h>
+#include <asm/asm.h>
 
 #define DEBUG 0
 
@@ -102,28 +102,38 @@
  o
 */
 
-#define PAGE_TABLE 0xc0000000L
-#define PPT 0x3
-#define PAGES (ENVS + LARGE_PAGE_SIZE)
-#define ENVS 0x100000000L
-#define PENVS 0x4
+#ifdef RISCV32
+	#define PAGE_TABLE 0x7fc00000
+	#define PPT 0x3
+	#define PAGES 0x7f800000
+	#define ENVS 0x7f400000
+	#define PENVS 0x4
+	#define KERNBASE 0x80000000 // 原来是 0x80010000
+	#define KSTACKTOP 0x81000000
+	#define ULIM 0x80000000
+	#define UTOP ULIM
+	#define UXSTACKTOP UTOP
+	#define USTACKTOP (UTOP - 2 * PAGE_SIZE)
+	#define UTEXT 0x00400000
+	#define UCOW 0x003ff000
+	#define UTEMP 0x003fe000
+#else
+	#define PAGE_TABLE 0xc0000000L
+	#define PPT 0x3
+	#define PAGES (ENVS + LARGE_PAGE_SIZE)
+	#define ENVS 0x100000000L
+	#define PENVS 0x4
+	#define KERNBASE 0x80000000L // 原来是 0x80010000
+	#define KSTACKTOP 0x81000000L
+	#define ULIM 0x80000000L
+	#define UTOP ULIM
+	#define UXSTACKTOP UTOP
+	#define USTACKTOP (UTOP - 2 * PAGE_SIZE)
+	#define UTEXT 0x00400000L
+	#define UCOW 0x003ff000L
+	#define UTEMP 0x003fe000L
+#endif
 
-#define KERNBASE 0x80000000L // 原来是 0x80010000
-
-#define KSTACKTOP 0x81000000L
-#define ULIM 0x80000000L
-
-// #define UVPT (ULIM - BY2PG2)
-// #define UPAGES (UVPT - LARGE_PAGE_SIZE)
-// #define UENVS (UPAGES - LARGE_PAGE_SIZE)
-
-#define UTOP ULIM
-#define UXSTACKTOP UTOP
-
-#define USTACKTOP (UTOP - 2 * PAGE_SIZE)
-#define UTEXT 0x00400000L
-#define UCOW 0x003ff000L
-#define UTEMP 0x003fe000L
 
 #ifndef __ASSEMBLER__
 
