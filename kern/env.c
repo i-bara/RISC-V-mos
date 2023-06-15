@@ -248,7 +248,9 @@ void env_init(void) {
 	
 	printk("page table is good\n");
 
-	virtio_init();
+	#if !defined(LAB) || LAB >= 5
+		virtio_init();
+	#endif
 
 	asid_bitmap[0] |= 1; // 占用 asid == 0
 }
