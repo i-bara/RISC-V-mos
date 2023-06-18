@@ -8,9 +8,22 @@
 #include <syscall.h>
 #include <trap.h>
 
+#ifdef SV32
+#define pt1 ((volatile long *)(PAGE_TABLE + (PAGE_TABLE >> 10)))
+#define pt0 ((volatile long *)(PAGE_TABLE))
+#define is_mapped(va) ((pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V))
+#define is_mapped_large(va) ((pt1[va >> VPN1_SHIFT] & PTE_V))
+#else
 #define pt2 ((volatile long *)(PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18)))
 #define pt1 ((volatile long *)(PAGE_TABLE + (PAGE_TABLE >> 9)))
 #define pt0 ((volatile long *)(PAGE_TABLE))
+#define is_mapped(va) ((pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V))
+#define is_mapped_large(va) ((pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V))
+#endif
+
+void debug_hex(void *args, int n);
+void user_debug_page_user();
+
 // #define vpd ((volatile Pde *)(UVPT + (PDX(UVPT) << PGSHIFT)))
 #define envs ((volatile struct Env *)ENVS)
 #define pages ((volatile struct Page *)PAGES)

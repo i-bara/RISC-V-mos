@@ -115,6 +115,7 @@ int fork_n(int n) {
 }
 
 int main() {
+	debugf("nyan!\n");
 	timer = (u_int *)UTEMP;
 	syscall_mem_alloc(0, (void *)timer, PTE_R | PTE_W | PTE_U | PTE_LIBRARY);
 	*timer = 0;

@@ -222,7 +222,7 @@ void env_init(void) {
 
 	// debug_page(&base_pgdir);
 
-	u_long satp = SATP_MODE_SV39 | (base_pgdir >> 12);
+
 	// printk("satp=%016lx\n", satp);
 
 	// u_long status;
@@ -244,7 +244,14 @@ void env_init(void) {
 	// printk("%016lx!\n", *((u_long *)base_pgdir + 2) << 2);
 	// printk("%016lx!\n", *((u_long *)base_pgdir + 3));
 	// printk("%016lx!\n", *((u_long *)base_pgdir + 4));
+
+	#ifdef SV32
+	u_long satp = (SATP_MODE_SV32 & SATP_MODE) | ((base_pgdir >> 12) & SATP_PPN);
 	asm volatile("csrw satp, %0" : : "r"(satp));
+	#else // Sv39
+	u_long satp = (SATP_MODE_SV39 & SATP_MODE) | ((base_pgdir >> 12) & SATP_PPN);
+	asm volatile("csrw satp, %0" : : "r"(satp));
+	#endif
 	
 	printk("page table is good\n");
 
@@ -292,10 +299,16 @@ static int env_setup_vm(struct Env *e) {
 
 	// printk("nyan!");
 	alloc_pgdir(&e->env_pgdir);
+	map_page(&e->env_pgdir, e->env_asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (PAGE_TABLE >> (2 * PN_SHIFT)), e->env_pgdir, PTE_R | PTE_U); // 6.18 罪魁祸首是这里，忘记了映射页表
 	// printk("pgdir is %016lx\n", e->env_pgdir);
 	// printk("%016lx\n", (u_long *)e->env_pgdir);
 
+	#ifdef RISCV32
+	((u_long *)e->env_pgdir)[0x1fd] = ((u_long *)base_pgdir)[0x1fd] | PTE_V; // 映射 pages 和 envs
+	((u_long *)e->env_pgdir)[0x1fe] = ((u_long *)base_pgdir)[0x1fe] | PTE_V;
+	#else
 	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V; // 这样不可以，因为标记不一样
+	#endif
 
 	// ((u_long *)e->env_pgdir)[PPT] = PA2PTE(e->env_pgdir) | PTE_V; 不可以这样自映射
 	
@@ -338,10 +351,6 @@ int env_alloc(struct Env **new, u_int parent_id) {
 	}
 	e = LIST_FIRST(&env_free_list);
 
-	/* Step 2: Call a 'env_setup_vm' to initialize the user address space for this new Env. */
-	/* Exercise 3.4: Your code here. (2/4) */
-	try(env_setup_vm(e));
-
 	/* Step 3: Initialize these fields for the new Env with appropriate values:
 	 *   'env_user_tlb_mod_entry' (lab4), 'env_runs' (lab6), 'env_id' (lab3), 'env_asid' (lab3),
 	 *   'env_parent_id' (lab3)
@@ -358,6 +367,10 @@ int env_alloc(struct Env **new, u_int parent_id) {
 	e->env_id = mkenvid(e);
 	try(asid_alloc(&e->env_asid));
 	e->env_parent_id = parent_id;
+
+	/* Step 2: Call a 'env_setup_vm' to initialize the user address space for this new Env. */
+	/* Exercise 3.4: Your code here. (2/4) */
+	try(env_setup_vm(e));
 
 	/* Step 4: Initialize the sp and 'cp0_status' in 'e->env_tf'. */
 	// Timer interrupt (STATUS_IM4) will be enabled.
@@ -420,7 +433,7 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
 		#ifdef DEBUG_ELF
 		printk("from %016lx to %016lx->%016lx(%d)\n", src, (void *)(va + offset), (void *)(pa + offset), len);
 		#endif
-		memcpy((void *)(pa + offset), src, len);
+		memcpy((void *)pa, src, len); // 6.17 修复漏洞：va 本身就带有 offset（其低位正是 offset），因此 pa 无需加 offset
 		#ifdef DEBUG_ELF
 		printk("%016lx\n", *(u_long *)pa);
 		printk("%016lx\n", ((u_long *)pa)[1]);
@@ -441,7 +454,12 @@ static int load_icode_mapper(void *data, u_long va, size_t offset, u_int perm, c
  */
 static void load_icode(struct Env *e, const void *binary, size_t size) {
 	/* Step 1: Use 'elf_from' to parse an ELF header from 'binary'. */
+	#ifdef RISCV32
+	const Elf32_Ehdr *ehdr = elf_from(binary, size);
+	#else // riscv64
 	const Elf64_Ehdr *ehdr = elf_from_64(binary, size);
+	#endif
+
 	if (!ehdr) {
 		panic("bad elf at %x", binary);
 	}
@@ -459,12 +477,22 @@ static void load_icode(struct Env *e, const void *binary, size_t size) {
 		#ifdef DEBUG_ELF
 		printk("elf!\n");
 		#endif
+
+		#ifdef RISCV32
+		Elf32_Phdr *ph = (Elf32_Phdr *)(binary + ph_off);
+		#else // riscv64
 		Elf64_Phdr *ph = (Elf64_Phdr *)(binary + ph_off);
+		#endif
+		
 		if (ph->p_type == PT_LOAD) {
 			// 'elf_load_seg' is defined in lib/elfloader.c
 			// 'load_icode_mapper' defines the way in which a page in this segment
 			// should be mapped.
+			#ifdef RISCV32
+			panic_on(elf_load_seg(ph, binary + ph->p_offset, load_icode_mapper, e));
+			#else // riscv64
 			panic_on(elf_load_seg_64(ph, binary + ph->p_offset, load_icode_mapper, e));
+			#endif
 		}
 	}
 	
@@ -506,7 +534,14 @@ struct Env *env_create(const void *binary, size_t size, int priority) {
 	// try(page_alloc(&pp));
 	// e->env_pgdir = page2pa(pp); // 这个不应该写，因为 load_icode 的时候就分配了页目录
 
+	#ifdef RISCV32
+	for (u_long vpn1 = 0x200; vpn1 < 0x400; vpn1++) {
+		((u_long *)e->env_pgdir)[vpn1] = ((u_long *)base_pgdir)[vpn1]; // 快速的映射！
+	}
+	#else
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
+	#endif
+
 	// map_pages(&e->env_pgdir, e->env_asid, 0x80000000, 0x80000000, 0x0000000004000000, PTE_R | PTE_W | PTE_X); // map 物理地址，稍后可以优化
 	TAILQ_INSERT_HEAD(&env_sched_list, e, env_sched_link);
 
@@ -676,12 +711,22 @@ void env_run(struct Env *e) {
 	// lab 2: tlb
 
 
-	
+
+	// printk("%08x\n", e->env_tf.sepc);
+	// u_long pa = get_pa(&cur_pgdir, e->env_tf.sepc);
+	// printk("%08x: %08x\n", pa, ((u_long *)pa)[0]);
+	// printk("          %08x\n", ((u_long *)pa)[1]);
+	// printk("          %08x\n", ((u_long *)pa)[2]);
+	// printk("          %08x\n", ((u_long *)pa)[3]);
 	asm volatile("csrw sepc, %0" : : "r"(e->env_tf.sepc));
 	u_long status;
 	asm volatile("csrr %0, sstatus" : "=r"(status));
 	// printk("sstatus = %016lx\n", status);
+	#ifdef RISCV32
+	asm volatile("csrw sstatus, %0" : : "r"(status & 0xfffffeff));
+	#else // riscv39
 	asm volatile("csrw sstatus, %0" : : "r"(status & 0xfffffffffffffeff));
+	#endif
 	// asm volatile("csrr %0, sstatus" : "=r"(status));
 	// printk("sstatus = %016lx\n", status);
 	
@@ -691,9 +736,20 @@ void env_run(struct Env *e) {
 
 	// debug_pte(&cur_pgdir, 0x80200000L);
 
+	#ifdef RISCV32
+	for (u_long vpn1 = 0x200; vpn1 < 0x400; vpn1++) {
+		((u_long *)e->env_pgdir)[vpn1] = ((u_long *)base_pgdir)[vpn1]; // 快速的映射！
+	}
+	#else
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！不知道为什么摧毁摧毁后切换的下一个进程没有内核映射
+	#endif
 
+	#ifdef SV32
+	asm volatile("csrw satp, %0" : : "r"((SATP_MODE_SV32 & SATP_MODE) | (((u_long)e->env_asid << 22) & SATP_ASID) | ((e->env_pgdir >> 12) & SATP_PPN)));
+	#else // Sv39
 	asm volatile("csrw satp, %0" : : "r"((SATP_MODE_SV39 & SATP_MODE) | (((u_long)e->env_asid << 44) & SATP_ASID) | ((e->env_pgdir >> 12) & SATP_PPN)));
+	#endif
+	
 	asm volatile("sfence.vma x0, x0");
 	
 	// 一种简单的自映射方法，但是在 RISC-V 下不可以这样，因为这样无法访问页表，因为缺少 PTE_R
@@ -702,8 +758,13 @@ void env_run(struct Env *e) {
 	// debug_page_user(&e->env_pgdir);
 	// printk("%016lx\n", e->env_pgdir);
 
-
+	#ifdef RISCV32
+	((u_long *)e->env_pgdir)[0x1fd] = ((u_long *)base_pgdir)[0x1fd] | PTE_V; // 映射 pages 和 envs
+	((u_long *)e->env_pgdir)[0x1fe] = ((u_long *)base_pgdir)[0x1fe] | PTE_V;
+	#else
 	((u_long *)e->env_pgdir)[4] = ((u_long *)base_pgdir)[4] | PTE_V; // 映射 pages 和 envs
+	#endif
+	
 	// debug_page(&e->env_pgdir);
 
 	// printk("%016lx\n", ((struct Env *)ENVS)[0].env_id);

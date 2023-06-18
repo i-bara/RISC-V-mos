@@ -573,6 +573,604 @@ static void _debug_page(u_long va, u_long pte) {
 	printk("|\n");
 }
 
+#ifdef SV32
+
+void debug_page(u_long *pgdir) {
+	printk("---------------------page----------------------\n");
+	for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
+		u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
+				u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+				if (*pte0 & PTE_V) {
+					u_long va = vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
+					_debug_page(va, *pte0);
+
+				}
+			}
+		}
+	}
+	printk("-----------------------------------------------\n");
+}
+
+void debug_page_user(u_long *pgdir) {
+	printk("---------------------page----------------------\n");
+	for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
+		u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
+				u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+				if ((*pte0 & PTE_V) && (*pte0 & PTE_U)) {
+					u_long va = vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
+					_debug_page(va, *pte0);
+
+				}
+			}
+		}
+	}
+	printk("-----------------------------------------------\n");
+}
+
+void debug_page_va(u_long *pgdir, u_long va) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+		if (*pte0 & PTE_V) {
+			_debug_page(va, *pte0);
+
+		} else {
+			printk("%016lx invalid\n", va);
+		}
+	} else {
+		printk("%016lx invalid\n", va);
+	}
+}
+
+u_long debug_pte(u_long *pgdir, u_long va) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+	printk("%3lx: %3lx\n", vpn1, vpn0);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+	printk("pte1 = %016lx: %016lx\n", pte1, *pte1);
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+		printk("pte0 = %016lx: %016lx\n", pte0, *pte0);
+
+		if (*pte0 & PTE_V) {
+			return *pte0;
+
+		} else {
+			printk("invalid\n");
+		}
+	} else {
+		printk("invalid\n");
+	}
+	return -1;
+}
+
+u_long get_pa(u_long *pgdir, u_long va) {
+	// u_long *pte;
+	// u_long pgdir2;
+	// pte = &((u_long *)*pgdir)[VPN1(va)];
+	// printk("kkk pte = %016lx\n", *pte);
+	// if (*pte & PTE_V) {
+	// 	pgdir2 = (u_long)PTE2PA(*pte);
+	// }
+	// pte = &((u_long *)pgdir2)[VPN0(va)];
+	// printk("kkk pte = %016lx\n", *pte);
+
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+	// printk("%08x [%08x: %08x]\n", va, vpn1, vpn0);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+		if (*pte0 & PTE_V) {
+			return PTE2PA(*pte0) | (va & PTE_OFFSET);
+
+		} else {
+			return -1;
+		}
+	} else {
+		return -1;
+	}
+}
+
+u_long get_perm(u_long *pgdir, u_long va) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+		if (*pte0 & PTE_V) {
+			return PTE2PERM(*pte0);
+
+		} else {
+			return -1;
+		}
+	} else {
+		return -1;
+	}
+}
+
+void set_pa(u_long *pgdir, u_long va, u_long pa) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+		if (*pte0 & PTE_V) {
+			u_long perm = PTE2PERM(*pte0);
+			*pte0 = PA2PTE(pa) | perm;
+
+		}
+	}
+}
+
+void set_perm(u_long *pgdir, u_long va, u_long perm) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+
+	if (*pte1 & PTE_V) {
+		u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+		if (*pte0 & PTE_V) {
+			u_long pa = PTE2PA(*pte0);
+			*pte0 = PA2PTE(pa) | perm;
+
+		}
+	}
+}
+
+int alloc_page(u_long *pgdir, u_int asid, u_long va, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm: %08x", perm);
+	}
+	
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				u_long original_pa = PTE2PA(*pte0);
+				// clear
+				if (--pa2page(original_pa)->pp_ref == 0) {
+					page_free(pa2page(original_pa));
+				}
+				goto map;
+			} else {
+				goto map;
+			}
+		} else {
+			goto create_pte0;
+		}
+	} else {
+		goto create_pte1;
+	}
+
+	struct Page *pp;
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)*pgdir)[vpn1];
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+map:
+	tlb_invalidate(asid, va);
+	try(page_alloc(&pp));
+	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
+	pp->pp_ref++;
+
+	// printk("alloc %x\n", va, curenv->env_id);
+	// debug_page_va(pgdir, va);
+
+	return 0;
+}
+
+int map_page(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm: %08x", perm);
+	}
+
+	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 
+		panic("invalid phisical memory");
+	}
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				u_long original_pa = PTE2PA(*pte0);
+				if (original_pa == PTE2PA(PA2PTE(pa))) {
+					// add perm
+					tlb_invalidate(asid, va);
+					*pte0 = PA2PTE(pa) | perm | PTE_V;
+					return 0;
+				} else {
+					// clear
+					if (--pa2page(original_pa)->pp_ref == 0) {
+						page_free(pa2page(original_pa));
+					}
+					goto map;
+				}
+			} else {
+				goto map;
+			}
+		} else {
+			goto create_pte0;
+		}
+	} else {
+		goto create_pte1;
+	}
+
+	struct Page *pp;
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)*pgdir)[vpn1];
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+map:
+	tlb_invalidate(asid, va);
+	*pte0 = PA2PTE(pa) | perm | PTE_V;
+	if ((pa >= KERNBASE && pa < KERNBASE + MEMORY_SIZE)) { 
+		pa2page(pa)->pp_ref++; // 只有内存才有页控制块
+	}
+
+	return 0;
+}
+
+int alloc_page_user(u_long *pgdir, u_int asid, u_long va, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm: %08x", perm);
+	}
+
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				u_long original_pa = PTE2PA(*pte0);
+				// clear
+				if (--pa2page(original_pa)->pp_ref == 0) {
+					page_free(pa2page(original_pa));
+				}
+				goto map;
+			} else {
+				goto map;
+			}
+		} else {
+			goto create_pte0;
+		}
+	} else {
+		goto create_pte1;
+	}
+
+	struct Page *pp;
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)*pgdir)[vpn1];
+
+	#ifdef DEBUG_PAGE
+	printk("self alloc %016lx->%016lx\n", PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1, PTE_R | PTE_U);
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+	// 建立自映射
+	#ifdef DEBUG_PAGE
+	printk("self alloc %016lx->%016lx\n", PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0, PTE_R | PTE_U);
+	// get_pa(pgdir, va);
+	// debug_page(pgdir);
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> PN_SHIFT), get_pa(pgdir, PAGE_TABLE + (va >> PN_SHIFT)));
+
+map:
+	tlb_invalidate(asid, va);
+	try(page_alloc(&pp));
+	
+	*pte0 = PA2PTE(page2pa(pp)) | perm | PTE_V;
+	pp->pp_ref++;
+
+	// if (curenv) {
+	// 	printk("alloc in env %x\n", curenv->env_id);
+	// } else {
+	// 	printk("alloc in kernel\n");
+	// }
+	
+	// debug_page_va(pgdir, va);
+
+	return 0;
+}
+
+int map_page_user(u_long *pgdir, u_int asid, u_long va, u_long pa, u_int perm) {
+	if (perm >= 0x400) {
+		panic("invalid perm: %08x", perm);
+	}
+
+	if ((pa < KERNBASE || pa >= KERNBASE + MEMORY_SIZE) && (pa < 0x10001000 || pa >= 0x10009000)) { 
+		panic("invalid phisical memory");
+	}
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				u_long original_pa = PTE2PA(*pte0);
+				if (original_pa == PTE2PA(PA2PTE(pa))) {
+					// add perm
+					tlb_invalidate(asid, va);
+					*pte0 = PA2PTE(pa) | perm | PTE_V;
+					return 0;
+				} else {
+					// clear
+					if (--pa2page(original_pa)->pp_ref == 0) {
+						page_free(pa2page(original_pa));
+					}
+					goto map;
+				}
+			} else {
+				goto map;
+			}
+		} else {
+			goto create_pte0;
+		}
+	} else {
+		goto create_pte1;
+	}
+
+	struct Page *pp;
+
+create_pte1:
+	try(page_alloc(&pp));
+	*pgdir = page2pa(pp);
+	pp->pp_ref++;
+
+	pte1 = &((u_long *)*pgdir)[vpn1];
+
+	#ifdef DEBUG_PAGE
+	printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1, PTE_R | PTE_U);
+
+create_pte0:
+	try(page_alloc(&pp));
+	*pte1 = PA2PTE(page2pa(pp)) | PTE_V;
+	pp->pp_ref++;
+	
+	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+	// 建立自映射
+	#ifdef DEBUG_PAGE
+	printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0, PTE_R | PTE_U);
+	// debug_page(pgdir);
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> PN_SHIFT), get_pa(pgdir, PAGE_TABLE + (va >> PN_SHIFT)));
+	
+map:
+	tlb_invalidate(asid, va);
+	*pte0 = PA2PTE(pa) | perm | PTE_V;
+	if ((pa >= KERNBASE && pa < KERNBASE + MEMORY_SIZE)) { 
+		pa2page(pa)->pp_ref++; // 只有内存才有页控制块
+	}
+
+	return 0;
+}
+
+int unmap_page(Pde *pgdir, u_int asid, u_long va) {
+	if (va >= KERNBASE && va < KERNBASE + MEMORY_SIZE) {
+		panic("nyan");
+	}
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				u_long original_pa = PTE2PA(*pte0);
+
+				// clear
+				if (--pa2page(original_pa)->pp_ref == 0) {
+					page_free(pa2page(original_pa));
+				}
+
+				// unmap(map at 0L)
+				tlb_invalidate(asid, va);
+				*pte0 = 0;
+				// tlb_invalidate(asid, PAGE_TABLE + (va >> PN_SHIFT));
+			}
+		}
+	}
+
+	return 0;
+}
+
+int is_mapped_page(Pde *pgdir, u_long va) {
+	u_long vpn0 = VPN0(va);
+	u_long vpn1 = VPN1(va);
+
+	u_long *pte1;
+	u_long *pte0;
+
+	if (*pgdir) {
+		pte1 = &((u_long *)*pgdir)[vpn1];
+
+		if (*pte1 & PTE_V) {
+			pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+			if (*pte0 & PTE_V) {
+				return 1;
+			} else {
+				return 0;
+			}
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+}
+
+int alloc_pgdir(u_long *pgdir) {
+	struct Page *p;
+	try(page_alloc(&p));
+	p->pp_ref++;
+	*pgdir = page2pa(p);
+	return 0;
+}
+
+int destroy_pgdir(u_long *pgdir, u_int asid) {
+	if (*pgdir) {
+		for (u_long vpn1 = 0; vpn1 < PAGE_SIZE / sizeof(u_long); vpn1++) {
+			u_long *pte1 = &((u_long *)*pgdir)[vpn1];
+			if (vpn1 == 0x1fd || vpn1 == 0x1fe || vpn1 >= 0x200) {
+				continue; // 两种映射形式！巨页映射应该巨页销毁！
+			} 
+
+			if (*pte1 & PTE_V) {
+				for (u_long vpn0 = 0; vpn0 < PAGE_SIZE / sizeof(u_long); vpn0++) {
+					u_long *pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
+
+					if (*pte0 & PTE_V) {
+						u_long va = vpn1 << VPN1_SHIFT | vpn0 << VPN0_SHIFT;
+						u_long pa = PTE2PA(*pte0);
+
+						// clear
+						if (--pa2page(pa)->pp_ref == 0) {
+							page_free(pa2page(pa));
+						}
+
+						// unmap
+						tlb_invalidate(asid, va);
+						*pte0 = 0L;
+					}
+				}
+				u_long va = PPT << VPN1_SHIFT | vpn1 << VPN0_SHIFT;
+				u_long pa = PTE2PA(*pte1);
+
+				// clear
+				if (--pa2page(pa)->pp_ref == 0) {
+					page_free(pa2page(pa));
+				}
+
+				// unmap
+				tlb_invalidate(asid, va);
+				*pte1 = 0L;
+			}
+		}
+		u_long va = PPT << VPN1_SHIFT | PPT << VPN0_SHIFT;
+		u_long pa = *pgdir;
+
+		// clear
+		if (--pa2page(pa)->pp_ref == 0) {
+			page_free(pa2page(pa));
+		}
+
+		// unmap
+		tlb_invalidate(asid, va);
+		*pgdir = 0L;
+	}
+	return 0;
+}
+
+u_long get(u_long *pgdir, u_long va) {
+	u_long pa = get_pa(pgdir, va);
+	return *(u_long *)pa;
+}
+
+#else // SV39
+
 void debug_page(u_long *pgdir) {
 	printk("---------------------page----------------------\n");
 	for (u_long vpn2 = 0; vpn2 < PAGE_SIZE / sizeof(u_long); vpn2++) {
@@ -1011,7 +1609,10 @@ create_pte2:
 
 	pte2 = &((u_long *)*pgdir)[vpn2];
 
-	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18) + (va >> 27), (u_long)pte2, PTE_R | PTE_U);
+	#ifdef DEBUG_PAGE
+	printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (PAGE_TABLE >> (2 * PN_SHIFT)) + (va >> (3 * PN_SHIFT)), (u_long)pte2);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (PAGE_TABLE >> (2 * PN_SHIFT)) + (va >> (3 * PN_SHIFT)), (u_long)pte2, PTE_R | PTE_U);
 
 create_pte1:
 	try(page_alloc(&pp));
@@ -1020,7 +1621,10 @@ create_pte1:
 
 	pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
 
-	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (va >> 18), (u_long)pte1, PTE_R | PTE_U);
+	#ifdef DEBUG_PAGE
+	printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1, PTE_R | PTE_U);
 
 create_pte0:
 	try(page_alloc(&pp));
@@ -1030,11 +1634,12 @@ create_pte0:
 	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 	// 建立自映射
-	// printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
-	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
-	get_pa(pgdir, va);
+	#ifdef DEBUG_PAGE
+	printk("self mapping %016lx->%016lx\n", PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0);
+	#endif
+	map_page(pgdir, asid, PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0, PTE_R | PTE_U);
 	// debug_page(pgdir);
-	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> 9), get_pa(pgdir, PAGE_TABLE + (va >> 9)));
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> PN_SHIFT), get_pa(pgdir, PAGE_TABLE + (va >> PN_SHIFT)));
 
 map:
 	tlb_invalidate(asid, va);
@@ -1115,7 +1720,7 @@ create_pte2:
 
 	pte2 = &((u_long *)*pgdir)[vpn2];
 
-	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (PAGE_TABLE >> 18) + (va >> 27), (u_long)pte2, PTE_R | PTE_U);
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (PAGE_TABLE >> (2 * PN_SHIFT)) + (va >> (3 * PN_SHIFT)), (u_long)pte2, PTE_R | PTE_U);
 
 create_pte1:
 	try(page_alloc(&pp));
@@ -1124,7 +1729,7 @@ create_pte1:
 
 	pte1 = &((u_long *)PTE2PA(*pte2))[vpn1];
 
-	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> 9) + (va >> 18), (u_long)pte1, PTE_R | PTE_U);
+	map_page(pgdir, asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (va >> (2 * PN_SHIFT)), (u_long)pte1, PTE_R | PTE_U);
 
 create_pte0:
 	try(page_alloc(&pp));
@@ -1134,10 +1739,10 @@ create_pte0:
 	pte0 = &((u_long *)PTE2PA(*pte1))[vpn0];
 
 	// 建立自映射
-	// printk("%016lx->%016lx\n", PAGE_TABLE + (va >> 9), (u_long)pte0);
-	map_page(pgdir, asid, PAGE_TABLE + (va >> 9), (u_long)pte0, PTE_R | PTE_U);
+	// printk("%016lx->%016lx\n", PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0);
+	map_page(pgdir, asid, PAGE_TABLE + (va >> PN_SHIFT), (u_long)pte0, PTE_R | PTE_U);
 	// debug_page(pgdir);
-	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> 9), get_pa(pgdir, PAGE_TABLE + (va >> 9)));
+	// printk("%016lx: %016lx->%016lx\n", *pgdir, PAGE_TABLE + (va >> PN_SHIFT), get_pa(pgdir, PAGE_TABLE + (va >> PN_SHIFT)));
 	
 map:
 	tlb_invalidate(asid, va);
@@ -1223,22 +1828,6 @@ int is_mapped_page(Pde *pgdir, u_long va) {
 	}
 }
 
-// int create_pd(Pde **pgdir) {
-// 	struct Page *pp;
-// 	try(page_alloc(&pp));
-// 	*pgdir = (Pde *)page2kva(pp);
-// 	pp->pp_ref++;
-// 	return 0;
-// }
-
-// int create_pt(Pde *pgdir, u_long pdx) {
-// 	struct Page *pp;
-// 	try(page_alloc(&pp));
-// 	pgdir[pdx] = page2pa(pp) | PTE_D | PTE_V;
-// 	pp->pp_ref++;
-// 	return 0;
-// }
-
 int alloc_pgdir(u_long *pgdir) {
 	struct Page *p;
 	try(page_alloc(&p));
@@ -1318,14 +1907,9 @@ int destroy_pgdir(u_long *pgdir, u_int asid) {
 	return 0;
 }
 
-// void set(Pde *pgdir, u_long va, u_long value) {
-// 	u_long pa = get_pa(pgdir, va);
-// 	pa = pa | va & 0x00000fff;
-// 	u_long kva = KADDR(pa);
-// 	*(u_long *)kva = value;
-// }
-
 u_long get(u_long *pgdir, u_long va) {
 	u_long pa = get_pa(pgdir, va);
 	return *(u_long *)pa;
 }
+
+#endif

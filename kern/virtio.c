@@ -15,6 +15,12 @@ struct virtio_blk_req read_buffer;
 struct virtio_blk_req write_buffer;
 struct virtio_blk_req flush_buffer;
 
+#ifdef RISCV32
+typedef le32 le;
+#else
+typedef le64 le;
+#endif
+
 void virtio_init() {
 	for (u_long diskva = 0xb0001000; diskva < 0xb0009000; diskva += 0x1000) {
 		struct Virtio *disk = (struct Virtio *)diskva;
@@ -41,7 +47,7 @@ void virtio_init() {
 
 	u_long diskva = 0xb0008000; // 映射到了这个虚拟地址
 	struct Virtio *disk = (struct Virtio *)diskva;
-	printk("queue num max    : %016lx\n", disk->queue_num_max);
+	printk("queue num max    : %08x\n", disk->queue_num_max);
 
 	u_int magic_value = disk->magic_value;
 	u_int version = disk->version;
@@ -103,9 +109,9 @@ void virtio_init() {
 
 	disk->queue_num = QUEUE_SIZE;
 
-	disk->queue_desc = (u_long)desc;
-	disk->queue_avail = (u_long)avail;
-	disk->queue_used = (u_long)used;
+	disk->queue_desc = (le)desc;
+	disk->queue_avail = (le)avail;
+	disk->queue_used = (le)used;
 
 	assert(disk->queue_ready == 0);
 	disk->queue_ready = 1;
@@ -113,58 +119,58 @@ void virtio_init() {
 	
 	read_buffer.type = VIRTIO_BLK_T_IN; // 读
 
-	desc[0].addr = (le64)&read_buffer;
+	desc[0].addr = (le)&read_buffer;
 	desc[0].len = 16;
 	desc[0].flags = VIRTQ_DESC_F_NEXT;
 	desc[0].next = 1;
 
-	desc[1].addr = (le64)&read_buffer.data;
+	desc[1].addr = (le)&read_buffer.data;
 	desc[1].len = 512;
 	desc[1].flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT; // 设备可写
 	desc[1].next = 2;
 
-	desc[2].addr = (le64)&read_buffer.status;
+	desc[2].addr = (le)&read_buffer.status;
 	desc[2].len = 1;
 	desc[2].flags = VIRTQ_DESC_F_WRITE;
 
     write_buffer.type = VIRTIO_BLK_T_OUT; // 写
 
-    desc[3].addr = (le64)&write_buffer;
+    desc[3].addr = (le)&write_buffer;
 	desc[3].len = 16;
 	desc[3].flags = VIRTQ_DESC_F_NEXT;
 	desc[3].next = 4;
 
-	desc[4].addr = (le64)&write_buffer.data;
+	desc[4].addr = (le)&write_buffer.data;
 	desc[4].len = 512;
 	desc[4].flags = VIRTQ_DESC_F_NEXT; // 设备可读
 	desc[4].next = 5;
 
-	desc[5].addr = (le64)&write_buffer.status;
+	desc[5].addr = (le)&write_buffer.status;
 	desc[5].len = 1;
 	desc[5].flags = VIRTQ_DESC_F_WRITE;
 
 	flush_buffer.type = VIRTIO_BLK_T_FLUSH; // flush
 
-    desc[6].addr = (le64)&flush_buffer;
+    desc[6].addr = (le)&flush_buffer;
 	desc[6].len = 16;
 	desc[6].flags = VIRTQ_DESC_F_NEXT;
 	desc[6].next = 7;
 
-	desc[7].addr = (le64)&flush_buffer.data;
+	desc[7].addr = (le)&flush_buffer.data;
 	desc[7].len = 512;
 	desc[7].flags = VIRTQ_DESC_F_NEXT; // 设备可读
 	desc[7].next = 8;
 
-	desc[8].addr = (le64)&flush_buffer.status;
+	desc[8].addr = (le)&flush_buffer.status;
 	desc[8].len = 1;
 	desc[8].flags = VIRTQ_DESC_F_WRITE;
 
 	// for (int i = 0; i < 3; i++) {
 	// 	printk("%lx-%lx\n", desc[i].addr, desc[i].addr + desc[i].len);
 	// }
-	printk("device size      : %lx\n", disk->config.capacity);
+	printk("device size      : %lx\n", (u_long)disk->config.capacity); // 6.17 printk 尚未支持 long long，因此不加 (u_long) 可能导致异常
 	printk("config generation: %d\n", disk->config_generation);
-	// printk("size=%d\n", (le32)sizeof(read_buffer));
+	// printk("size=%d\n", (le)sizeof(read_buffer));
 
 
 

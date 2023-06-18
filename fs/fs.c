@@ -20,7 +20,7 @@ u_long diskaddr(u_int blockno) {
 // Overview:
 //  Check if this virtual address is mapped to a block. (check PTE_V bit)
 int va_is_mapped(u_long va) {
-	return (pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V);
+	return is_mapped(va);
 }
 
 // Overview:

@@ -9,6 +9,9 @@
 
 #ifdef DEBUG
 #if (DEBUG >= 3)
+#define DEBUG_PAGE
+#endif
+#if (DEBUG >= 3)
 #define DEBUG_ELF
 #endif
 #endif
@@ -104,14 +107,13 @@
 
 #ifdef RISCV32
 	#define PAGE_TABLE 0x7fc00000
-	#define PPT 0x3
+	#define PPT 0x1ff // 开始的时候设置错了
 	#define PAGES 0x7f800000
 	#define ENVS 0x7f400000
-	#define PENVS 0x4
 	#define KERNBASE 0x80000000 // 原来是 0x80010000
 	#define KSTACKTOP 0x81000000
 	#define ULIM 0x80000000
-	#define UTOP ULIM
+	#define UTOP ENVS // 开始的时候设置错了
 	#define UXSTACKTOP UTOP
 	#define USTACKTOP (UTOP - 2 * PAGE_SIZE)
 	#define UTEXT 0x00400000

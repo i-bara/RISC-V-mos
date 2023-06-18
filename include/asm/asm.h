@@ -3,8 +3,10 @@
 
 #ifdef RISCV32
 	#include <asm/sv32.h>
+	#define SV32
 #else
 	#include <asm/sv39.h>
+	#define SV39
 #endif
 
 /*

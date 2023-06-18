@@ -49,6 +49,9 @@ int sys_print_cons(const void *s, u_long num) {
 	s += remain;
 	
 	while (num >= PAGE_SIZE) {
+		if (!is_mapped_page(&cur_pgdir, (u_long)s)) { // 6.18 防止缺页异常，但开销大，可以优化
+			alloc_page_user(&cur_pgdir, curenv->env_asid, (u_long)s, PTE_R | PTE_W | PTE_U);
+		}
 		pa = get_pa(&cur_pgdir, (u_long)s);
 		for (i = 0; i < PAGE_SIZE; i++) {
 			printcharc(((char *)pa)[i]);
@@ -58,6 +61,9 @@ int sys_print_cons(const void *s, u_long num) {
 	}
 
 	if (num) {
+		if (!is_mapped_page(&cur_pgdir, (u_long)s)) {
+			alloc_page_user(&cur_pgdir, curenv->env_asid, (u_long)s, PTE_R | PTE_W | PTE_U);
+		}
 		pa = get_pa(&cur_pgdir, (u_long)s);
 		for (i = 0; i < num; i++) {
 			printcharc(((char *)pa)[i]);
@@ -193,6 +199,8 @@ int sys_mem_alloc(u_long envid, u_long va, u_long perm) {
 
 	// /* Step 4: Map the allocated page at 'va' with permission 'perm' using 'page_insert'. */
 	// return page_insert(env->env_pgdir, env->env_asid, pp, va, perm);
+
+	// printk("alloc: %x:%08x\n", env->env_id, va);
 	return alloc_page_user(&env->env_pgdir, env->env_asid, va, perm);
 
 }
@@ -253,6 +261,20 @@ int sys_mem_map(u_long srcid, u_long srcva, u_long dstid, u_long dstva, u_long p
 
 	/* Step 5: Map the physical page at 'dstva' in the address space of 'dstid'. */
 	// return page_insert(dstenv->env_pgdir, dstenv->env_asid, pp, dstva, perm);
+
+	// 测试页表复制
+	// u_long dst_page_va = (u_long)PAGE_TABLE + (u_long)(dstva >> PN_SHIFT);
+	// u_long src_page_va = (u_long)PAGE_TABLE + (u_long)(srcva >> PN_SHIFT);
+	// if (!is_mapped_page(&dstenv->env_pgdir, dst_page_va)) {
+	// 	alloc_page(&dstenv->env_pgdir, dstenv->env_asid, dst_page_va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
+	// }
+	// if (!is_mapped_page(&cur_pgdir, src_page_va)) {
+	// 	alloc_page(&cur_pgdir, curenv->env_asid, src_page_va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
+	// }
+	// u_long dst_page_pa = get_pa(&dstenv->env_pgdir, dst_page_va);
+	// u_long src_page_pa = get_pa(&cur_pgdir, src_page_va);
+	// printk("MAP: %016lx->%016lx, %016lx->%016lx %x:%016lx->%x:%016lx\n", dst_page_va, dst_page_pa, src_page_va, src_page_pa, curenv->env_id, srcva, dstenv->env_id, dstva);
+	// memcpy((void *)dst_page_pa, (void *)src_page_pa, sizeof(u_long));
 	return map_page_user(&dstenv->env_pgdir, dstenv->env_asid, dstva, pa, perm);
 }
 
@@ -322,24 +344,58 @@ int sys_exofork(void) {
 		struct Page *pp;
 		try(page_alloc(&pp));
 		e->env_pgdir = page2pa(pp);
+		map_page(&e->env_pgdir, e->env_asid, PAGE_TABLE + (PAGE_TABLE >> PN_SHIFT) + (PAGE_TABLE >> (2 * PN_SHIFT)), e->env_pgdir, PTE_R | PTE_U); // 6.18 罪魁祸首是这里，忘记了映射页表
 	}
+
+	#ifdef RISCV32
+	for (u_long vpn1 = 0x200; vpn1 < 0x400; vpn1++) {
+		((u_long *)e->env_pgdir)[vpn1] = ((u_long *)base_pgdir)[vpn1]; // 快速的映射！
+	}
+	((u_long *)e->env_pgdir)[0x1fd] = ((u_long *)base_pgdir)[0x1fd] | PTE_V; // 映射 pages 和 envs
+	((u_long *)e->env_pgdir)[0x1fe] = ((u_long *)base_pgdir)[0x1fe] | PTE_V;
+
+	// // int debug_i = 0; // 测试页表复制 (1/3)
+	// for (u_long va = PAGE_TABLE; va < 0x80000000; va += PAGE_SIZE) {
+	// 	if (is_mapped_page(&cur_pgdir, va)) {
+	// 		printk("duppageL %08x\n", va);
+	// 		// printk("%016lx ", va); // 测试页表复制 (2/3)
+	// 		// if ((++debug_i) % 4 == 0) {
+	// 		// 	printk("\n");
+	// 		// }
+	// 		alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
+	// 		u_long pa = get_pa(&e->env_pgdir, va);
+	// 		u_long curpa = get_pa(&cur_pgdir, va);
+	// 		printk("%08x: %08x\n", curpa, *(u_long *)curpa);
+	// 		memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
+	// 	}
+	// }
+	// printk("\n"); // 测试页表复制 (3/3)
+	#else
 	((u_long *)e->env_pgdir)[2] = ((u_long *)base_pgdir)[2]; // 快速的映射！
 	((u_long *)e->env_pgdir)[PENVS] = ((u_long *)base_pgdir)[PENVS] | PTE_V;
 
-	// int debug_i = 0; // 测试页表复制 (1/3)
-	for (u_long va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
-		if (is_mapped_page(&cur_pgdir, va)) {
-			// printk("%016lx ", va); // 测试页表复制 (2/3)
-			// if ((++debug_i) % 4 == 0) {
-			// 	printk("\n");
-			// }
-			alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
-			u_long pa = get_pa(&e->env_pgdir, va);
-			u_long curpa = get_pa(&cur_pgdir, va);
-			memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
-		}
-	}
-	// printk("\n"); // 测试页表复制 (3/3)
+	// // int debug_i = 0; // 测试页表复制 (1/3) // 6.18 请勿复制页表！应该使用 map_page_user
+	// for (u_long va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
+	// 	if (va == 0xc02ff000) {
+	// 		printk("zzzzzzzzz\n");
+	// 		debug_pte(&cur_pgdir, va);
+	// 	}
+	// 	if (is_mapped_page(&cur_pgdir, va)) {
+	// 		printk("duppageL %08x\n", va);
+	// 		// printk("%016lx ", va); // 测试页表复制 (2/3)
+	// 		// if ((++debug_i) % 4 == 0) {
+	// 		// 	printk("\n");
+	// 		// }
+	// 		alloc_page(&e->env_pgdir, e->env_asid, va, PTE_R | PTE_W | PTE_U); // 不 user，直接复制
+	// 		u_long pa = get_pa(&e->env_pgdir, va);
+	// 		u_long curpa = get_pa(&cur_pgdir, va);
+	// 		memcpy((void *)pa, (void *)curpa, PAGE_SIZE);
+	// 		printk("%016lx: %016lx\n", curpa, *(u_long *)curpa);
+	// 	}
+	// }
+	// // printk("\n"); // 测试页表复制 (3/3)
+	#endif
+
 	#ifdef DEBUG
 	#if (DEBUG >= 2)
 	printk("%x: exofork %lx with epc=%016lx\n", curenv->env_id, e->env_id, e->env_tf.sepc);

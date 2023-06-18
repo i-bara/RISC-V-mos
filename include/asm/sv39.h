@@ -25,6 +25,8 @@
 #define PTE_PPN2 0x003ffffff0000000L
 #define PTE_PPN  0x003ffffffffffc00L
 
+#define PN_SHIFT 9
+
 #define PPN0_SHIFT 10
 #define PPN1_SHIFT 19
 #define PPN2_SHIFT 28

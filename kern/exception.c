@@ -47,6 +47,8 @@ void (*exception_handlers[32])(void) = {
 
 void handle_interrupt() {
 	u_long sip;
+	// printk("int!\n");
+	// print_tf(((struct Trapframe *)KSTACKTOP - 1));
 	asm volatile("csrr %0, sip " : "=r"(sip));
 	if (sip & 0x0000000000000020) {
 		schedule(0);
@@ -118,6 +120,7 @@ void handle_exception(u_long err) {
 				*(struct Trapframe *)(pa + sizeof(u_long)) = *tf;
 				*(u_long *)pa = (u_long)tf;
 				
+				// printk("entry=%08x\n", curenv->env_user_tlb_mod_entry);
 				tf->sepc = curenv->env_user_tlb_mod_entry;
 				tf->sscratch = UXSTACKTOP - sizeof(struct Trapframe) - sizeof(u_long);
 				tf->regs[10] = UXSTACKTOP - sizeof(struct Trapframe);
@@ -146,10 +149,37 @@ void handle_exception(u_long err) {
 			printk("Unknown");
 		}
 		printk(")\n");
-		printk("epc=%016lx\n", epc);
-		printk("status=%016lx\n", status);
-		printk("tval=%016lx\n", tval);
-		printk("env=%08x\n", curenv->env_id);
+
+		if (cause == 2) {
+			u_long pa = get_pa(&cur_pgdir, epc);
+			if (is_mapped_page(&cur_pgdir, epc)) {
+				#ifdef RISCV32
+				printk("%08x\n", ((u_long *)pa)[0]);
+				printk("%08x\n", ((u_long *)pa)[1]);
+				printk("%08x\n", ((u_long *)pa)[2]);
+				printk("%08x\n", ((u_long *)pa)[3]);
+				#else // riscv64
+				printk("%016lx\n", ((u_long *)pa)[0]);
+				printk("%016lx\n", ((u_long *)pa)[1]);
+				printk("%016lx\n", ((u_long *)pa)[2]);
+				printk("%016lx\n", ((u_long *)pa)[3]);
+				#endif
+			} else {
+				printk("Epc not mapped\n");
+			}
+		}
+
+		#ifdef RISCV32
+		printk("epc    : %08x\n", epc);
+		printk("status : %08x\n", status);
+		printk("tval   : %08x\n", tval);
+		printk("env    : %08x\n", curenv->env_id);
+		#else // riscv64
+		printk("epc    : %016lx\n", epc);
+		printk("status : %016lx\n", status);
+		printk("tval   : %016lx\n", tval);
+		printk("env    : %08x\n", curenv->env_id);
+		#endif
 		halt();
 	}
     

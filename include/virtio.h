@@ -28,46 +28,46 @@ struct virtio_blk_config {
 };
 
 struct Virtio {
-	volatile u_int magic_value;
-    volatile u_int version;
-    volatile u_int device_id;
-    volatile u_int vendor_id;
-    volatile u_int device_features;
-    volatile u_int device_features_sel;
-    volatile u_int device_features_reserved1;
-    volatile u_int device_features_reserved2;
-    volatile u_int driver_features;
-    volatile u_int driver_features_sel;
-    volatile u_int driver_features_reserved1;
-    volatile u_int driver_features_reserved2;
-    volatile u_int queue_sel;
-    volatile u_int queue_num_max;
-    volatile u_int queue_num;
-    volatile u_int queue_reserved1;
-    volatile u_int queue_reserved2;
-    volatile u_int queue_ready;
-    volatile u_int queue_reserved3;
-    volatile u_int queue_reserved4;
-    volatile u_int queue_notify; // 0x50
-    volatile u_int queue_reserved5;
-    volatile u_int queue_reserved6;
-    volatile u_int queue_reserved7;
-    volatile u_int interrupt_status;
-    volatile u_int interrupt_ack;
-    volatile u_int interrupt_reserved1;
-    volatile u_int interrupt_reserved2;
-    volatile u_int status; // 0x70
-    volatile u_int status_reserved1;
-    volatile u_int status_reserved2;
-    volatile u_int status_reserved3;
-    volatile u_long queue_desc;
-    volatile u_long queue_desc_padding;
-    volatile u_long queue_avail;
-    volatile u_long queue_avail_padding;
-    volatile u_long queue_used;
-    volatile u_long queue_used_padding;
+	volatile le32 magic_value;
+    volatile le32 version;
+    volatile le32 device_id;
+    volatile le32 vendor_id;
+    volatile le32 device_features;
+    volatile le32 device_features_sel;
+    volatile le32 device_features_reserved1;
+    volatile le32 device_features_reserved2;
+    volatile le32 driver_features;
+    volatile le32 driver_features_sel;
+    volatile le32 driver_features_reserved1;
+    volatile le32 driver_features_reserved2;
+    volatile le32 queue_sel;
+    volatile le32 queue_num_max;
+    volatile le32 queue_num;
+    volatile le32 queue_reserved1;
+    volatile le32 queue_reserved2;
+    volatile le32 queue_ready;
+    volatile le32 queue_reserved3;
+    volatile le32 queue_reserved4;
+    volatile le32 queue_notify; // 0x50
+    volatile le32 queue_reserved5;
+    volatile le32 queue_reserved6;
+    volatile le32 queue_reserved7;
+    volatile le32 interrupt_status;
+    volatile le32 interrupt_ack;
+    volatile le32 interrupt_reserved1;
+    volatile le32 interrupt_reserved2;
+    volatile le32 status; // 0x70
+    volatile le32 status_reserved1;
+    volatile le32 status_reserved2;
+    volatile le32 status_reserved3;
+    volatile le64 queue_desc;
+    volatile le64 queue_desc_padding;
+    volatile le64 queue_avail;
+    volatile le64 queue_avail_padding;
+    volatile le64 queue_used;
+    volatile le64 queue_used_padding;
     volatile u_char padding[0x4c];
-    volatile u_int config_generation;
+    volatile le32 config_generation;
     volatile struct virtio_blk_config config;
 };
 

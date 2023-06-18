@@ -164,7 +164,17 @@ int fork(void) {
 	/* Step 3: Map all mapped pages below 'USTACKTOP' into the child's address space. */
 	// Hint: You should use 'duppage'.
 	/* Exercise 4.15: Your code here. (1/2) */
-	for (int va = 0; va < USTACKTOP; va += PAGE_SIZE) { // 用户异常栈不 duppage，否则无法正确进入 cow_entry：
+
+	#ifdef RISCV32
+	for (u_long va = 0; va < USTACKTOP; va += PAGE_SIZE) {
+		if (pt1[va >> VPN1_SHIFT] & PTE_V) {
+			if (pt0[va >> VPN0_SHIFT] & PTE_V) {
+				duppage(child, va >> VPN0_SHIFT);
+			}
+		}
+	}
+	#else
+	for (u_long va = 0; va < USTACKTOP; va += PAGE_SIZE) { // 用户异常栈不 duppage，否则无法正确进入 cow_entry：
 		if (pt2[va >> VPN2_SHIFT] & PTE_V) {			// 一旦进入必须写时复制，但是必须进入才能写时复制，矛盾
 			if (pt1[va >> VPN1_SHIFT] & PTE_V) {
 				if (pt0[va >> VPN0_SHIFT] & PTE_V) {	// 内核在 exofork 内 duppage，这样能够实现快速的映射
@@ -173,6 +183,7 @@ int fork(void) {
 			}
 		}
 	}
+	#endif
 
 	/* Step 4: Set up the child's tlb mod handler and set child's 'env_status' to
 	 * 'ENV_RUNNABLE'. */
@@ -241,6 +252,15 @@ static void _debug_page(u_long va, u_long pte) {
 
 void user_debug_page_user() {
 	debugf("---------------------page----------------------\n");
+	#ifdef RISCV32
+	for (int va = 0; va < USTACKTOP; va += PAGE_SIZE) {
+		if (pt1[va >> VPN1_SHIFT] & PTE_V) {
+			if (pt0[va >> VPN0_SHIFT] & PTE_V) {
+				_debug_page(va, pt0[va >> VPN0_SHIFT]);
+			}
+		}
+	}
+	#else
 	for (int va = 0; va < USTACKTOP; va += PAGE_SIZE) {
 		if (pt2[va >> VPN2_SHIFT] & PTE_V) {
 			if (pt1[va >> VPN1_SHIFT] & PTE_V) {
@@ -250,6 +270,8 @@ void user_debug_page_user() {
 			}
 		}
 	}
+	#endif
+	
 	// for (int va = PAGE_TABLE; va < 0x100000000L; va += PAGE_SIZE) {
 	// 	if (pt2[va >> VPN2_SHIFT] & PTE_V) {
 	// 		if (pt1[va >> VPN1_SHIFT] & PTE_V) {

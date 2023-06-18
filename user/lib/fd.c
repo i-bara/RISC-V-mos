@@ -38,10 +38,12 @@ int fd_alloc(struct Fd **fd) {
 	for (fdno = 0; fdno < MAXFD - 1; fdno++) {
 		va = INDEX2FD(fdno);
 		
+		#ifdef SV39
 		if (!(pt2[va >> VPN2_SHIFT] & PTE_V)) {
 			*fd = (struct Fd *)va;
 			return 0;
 		}
+		#endif
 
 		if (!(pt1[va >> VPN1_SHIFT] & PTE_V)) {
 			*fd = (struct Fd *)va;
@@ -148,7 +150,7 @@ int dup(int oldfdnum, int newfdnum) {
 	ova = fd2data(oldfd);
 	nva = fd2data(newfd);
 
-	if ((pt2[ova >> VPN2_SHIFT] & PTE_V) && (pt1[ova >> VPN1_SHIFT] & PTE_V)) { // 原来是 vpd[PDX(ova)]，不知道有什么意义，可能是笔误
+	if (is_mapped_large(ova)) { // 原来是 vpd[PDX(ova)]，不知道有什么意义，可能是笔误
 		for (i = 0; i < LARGE_PAGE_SIZE; i += BY2PG) {
 			pte = pt0[(ova + i) >> VPN0_SHIFT];
 
@@ -309,7 +311,7 @@ void debug_fd() {
 	for (u_int fdno = 0; fdno < MAXFD; fdno++) {
 		u_long va = INDEX2FD(fdno);
 
-		if ((pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V)) {
+		if (is_mapped(va)) {
 			struct Fd *fd = (struct Fd *)va;
 			debugf("%-4d  ", fdno);
 			if (fd->fd_dev_id == devcons.dev_id) {

@@ -24,7 +24,11 @@ void print_tf(struct Trapframe *tf);
 
 #endif /* !__ASSEMBLER__ */
 
+#ifdef RISCV32
+#define _TRAP_LEN_ 4
+#else // riscv64
 #define _TRAP_LEN_ 8
+#endif
 
 #define TF_REG0 0
 #define TF_REG1 ((TF_REG0) + _TRAP_LEN_)

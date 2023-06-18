@@ -154,7 +154,7 @@ int read_map(int fdnum, u_int offset, void **blk) {
 		return -E_NO_DISK;
 	}
 
-	if (!(pt2[va >> VPN2_SHIFT] & PTE_V) || !(pt1[va >> VPN1_SHIFT] & PTE_V) || !(pt0[va >> VPN0_SHIFT] & PTE_V)) {
+	if (!is_mapped(va)) {
 		return -E_NO_DISK;
 	}
 

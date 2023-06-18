@@ -19,7 +19,13 @@ endif
 # CFLAGS         += --std=gnu99 -$(ENDIAN) -G 0 -mno-abicalls -fno-pic -ffreestanding -fno-stack-protector -fno-builtin -Wa,-xgot -Wall -mxgot -mfp32 -march=r3000
 LD             := $(CROSS_COMPILE)ld
 # LDFLAGS        += -$(ENDIAN) -G 0 -static -n -nostdlib --fatal-warnings
-LDFLAGS        += -$(ENDIAN) -G 0 -static -n -nostdlib --fatal-warnings -m elf64lriscv --no-warn-rwx-segments
+LDFLAGS        += -$(ENDIAN) -G 0 -static -n -nostdlib --fatal-warnings --no-warn-rwx-segments
+
+ifeq ($(xlen),32)
+	LDFLAGS         +=   -m elf32lriscv
+else
+	LDFLAGS         +=   -m elf64lriscv
+endif
 
 HOST_CC        := cc
 HOST_CFLAGS    += --std=gnu99 -O2 -Wall

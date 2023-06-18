@@ -72,7 +72,6 @@ int main() {
 			ptr[200] = i;
 			ptr[300] = 4;
 			debugf("@@@@grandson %x send Page to son %x\n", syscall_getenvid(), i);
-			debug_page_user();
 			debugf("send: %x(%016lx)\n", env->env_id, ptr);
 			ipc_send(i, 0, ptr, PTE_R | PTE_W | PTE_U | PTE_LIBRARY); // 注意样例的页面标记也需要修改
 
@@ -115,7 +114,6 @@ int main() {
 			debugf("@@@@1 %d lab %d strong testcase1\n", ptr[0], ptr[300]);
 			debugf("@@@@1 send is %x recv is %x\n", ptr[100], ptr[200]);
 			debugf("recv: %x(%016lx)\n", env->env_id, ptr);
-			debug_page_user();
 
 			ptr[0] = 4;
 			ptr[100] = syscall_getenvid();

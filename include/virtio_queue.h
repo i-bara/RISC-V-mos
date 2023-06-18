@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 // 加了个这个
-typedef u_long volatile le64; // 在这里防止编译器优化
+typedef unsigned long long volatile le64; // 在这里防止编译器优化 6.17 改为 long long 以兼容 32 位
 typedef u_int volatile le32;
 typedef u_short volatile le16;
 typedef u_char volatile u8;

@@ -104,7 +104,11 @@ static int spawn_mapper(void *data, u_long va, size_t offset, u_int perm, const 
 }
 
 void debug_Ehdr(char *elfbuf) {
+	#ifdef RISCV32
+	for (int i = 0; i < sizeof(Elf32_Ehdr); i++) {
+	#else // riscv64
 	for (int i = 0; i < sizeof(Elf64_Ehdr); i++) {
+	#endif
 		debugf("%02x ", (u_char)elfbuf[i]);
 		if (i % 4 == 3) {
 			debugf("\n");
@@ -129,11 +133,20 @@ int spawn(char *prog, char **argv) {
 	u_char elfbuf[512];
 	u_char elfbuf_ph[512];
 	/* Exercise 6.4: Your code here. (1/6) */
+	#ifdef RISCV32
+	if ((r = readn(fd, elfbuf, sizeof(Elf32_Ehdr))) < sizeof(Elf32_Ehdr)) {
+	#else
 	if ((r = readn(fd, elfbuf, sizeof(Elf64_Ehdr))) < sizeof(Elf64_Ehdr)) {
+	#endif
 		goto err;
 	}
 
+	#ifdef RISCV32
+	const Elf32_Ehdr *ehdr = elf_from(elfbuf, sizeof(Elf32_Ehdr));
+	#else
 	const Elf64_Ehdr *ehdr = elf_from_64(elfbuf, sizeof(Elf64_Ehdr));
+	#endif
+	
 	if (!ehdr) {
 		r = -E_NOT_EXEC;
 		goto err;
@@ -178,12 +191,22 @@ int spawn(char *prog, char **argv) {
 			goto err1;
 		}
 
+		#ifdef RISCV32
+		user_assert(ehdr->e_phentsize == sizeof(Elf32_Phdr));
+		if ((r = readn(fd, elfbuf_ph, sizeof(Elf32_Phdr))) < sizeof(Elf32_Phdr)) { // 全都要改成 64 位，否则无法导入
+		#else
 		user_assert(ehdr->e_phentsize == sizeof(Elf64_Phdr));
 		if ((r = readn(fd, elfbuf_ph, sizeof(Elf64_Phdr))) < sizeof(Elf64_Phdr)) { // 全都要改成 64 位，否则无法导入
+		#endif
 			goto err1;
 		}
 
+		#ifdef RISCV32
+		Elf32_Phdr *ph = (Elf32_Phdr *)elfbuf_ph; // 需要用两个缓存，否则会覆盖掉 ehdr
+		#else
 		Elf64_Phdr *ph = (Elf64_Phdr *)elfbuf_ph; // 需要用两个缓存，否则会覆盖掉 ehdr
+		#endif
+		
 		// debugf("ph_off: %d\n", ph_off);
 		// debugf("%016lx\n", ((u_long *)ph)[0]);
 		// debugf("%016lx\n", ((u_long *)ph)[1]);
@@ -207,7 +230,11 @@ int spawn(char *prog, char **argv) {
 			// Use 'spawn_mapper' as the callback, and '&child' as its data.
 			// 'goto err1' if that fails.
 			/* Exercise 6.4: Your code here. (6/6) */
+			#ifdef RISCV32
+			if ((r = elf_load_seg(ph, bin, spawn_mapper, &child)) < 0) {
+			#else
 			if ((r = elf_load_seg_64(ph, bin, spawn_mapper, &child)) < 0) {
+			#endif
 				goto err1;
 			}
 
@@ -226,15 +253,11 @@ int spawn(char *prog, char **argv) {
 
 	// Pages with 'PTE_LIBRARY' set are shared between the parent and the child.
 	for (int va = 0; va < USTACKTOP; va += PAGE_SIZE) {
-		if (pt2[va >> VPN2_SHIFT] & PTE_V) {
-			if (pt1[va >> VPN1_SHIFT] & PTE_V) {
-				if (pt0[va >> VPN0_SHIFT] & PTE_V) {
-					if ((pt0[va >> VPN0_SHIFT] & PTE_LIBRARY)) { // 仅 duppage 共享页面
-						if ((r = syscall_mem_map(0, va, child, va, pt0[va >> VPN0_SHIFT] & PTE_PERM)) < 0) {
-							debugf("spawn: syscall_mem_map %x %x: %d\n", va, child, r);
-							goto err2;
-						}
-					}
+		if (is_mapped(va)) {
+			if ((pt0[va >> VPN0_SHIFT] & PTE_LIBRARY)) { // 仅 duppage 共享页面
+				if ((r = syscall_mem_map(0, va, child, va, pt0[va >> VPN0_SHIFT] & PTE_PERM)) < 0) {
+					debugf("spawn: syscall_mem_map %x %x: %d\n", va, child, r);
+					goto err2;
 				}
 			}
 		}
@@ -312,11 +335,11 @@ int spawnl(char *prog, char *args, ...) {
 void debug_hex(void *args, int n) {
 	for (int i = 0; i < n; i++) {
 		debugf("%016lx: %016lx    ", &((u_long *)args)[i], ((u_long *)args)[i]);
-		for (int j = 0; j < 8; j++) {
-			if (((u_char *)args)[i * 8 + j] == '\n') {
+		for (int j = 0; j < sizeof(u_long); j++) {
+			if (((u_char *)args)[i * sizeof(u_long) + j] == '\n') {
 				debugf("\\n");
 			} else {
-				debugf(" %c", ((u_char *)args)[i * 8 + j]);
+				debugf(" %c", ((u_char *)args)[i * sizeof(u_long) + j]);
 			}
 		}
 		debugf("\n");

@@ -80,8 +80,8 @@ void test_fs() {
 	// block used to be free but not free any more
 	for (i = 0; i < 512; i++) {
 		r = alloced_block[i];
-		u_int va = 0x10000000 + (r << 12);
-		if (!((pt2[va >> VPN2_SHIFT] & PTE_V) && (pt1[va >> VPN1_SHIFT] & PTE_V) && (pt0[va >> VPN0_SHIFT] & PTE_V))) {
+		u_long va = 0x10000000 + (r << 12);
+		if (!(is_mapped(va))) {
 			user_panic("block map is wrong");
 		}
 		user_assert(bits[r / 32] & (1 << (r % 32)));
